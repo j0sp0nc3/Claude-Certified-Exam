@@ -1,7 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "simulacros-claude",
+  // Debe coincidir con el nombre del Worker conectado en Cloudflare (Workers Builds)
+  "name": "claude-certified-exam",
   "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "preview_urls": true,
   // Worker solo de archivos estáticos: sirve la carpeta examenes/ (index.html en la raíz)
   "assets": {
     "directory": "./examenes",

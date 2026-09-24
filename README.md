@@ -57,12 +57,18 @@ El script valida que haya 100 preguntas por examen, sin duplicados, y suficiente
 
 ## Despliegue en Cloudflare Workers
 
+El repositorio está conectado a Cloudflare Workers Builds: cada push a `main` ejecuta `npx wrangler deploy` y publica automáticamente.
+
+Sitio: https://claude-certified-exam.beroiza79.workers.dev/
+
+Despliegue manual (opcional):
+
 ```bash
 npx wrangler login
 npx wrangler deploy
 ```
 
-Publica `examenes/` como sitio estático en `https://simulacros-claude.<cuenta>.workers.dev/`. Para restringir el acceso al equipo, se puede proteger con Cloudflare Access.
+Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso al equipo, se puede proteger con Cloudflare Access.
 
 ## Limitaciones
 

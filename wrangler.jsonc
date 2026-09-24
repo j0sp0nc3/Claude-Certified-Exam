@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "simulacros-claude",
+  "compatibility_date": "2026-09-01",
+  // Worker solo de archivos estáticos: sirve la carpeta examenes/ (index.html en la raíz)
+  "assets": {
+    "directory": "./examenes",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

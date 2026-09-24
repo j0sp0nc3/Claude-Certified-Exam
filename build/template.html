@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+:root{
+  --bg:#f6f5f1;--surface:#ffffff;--surface-2:#f0eee8;--text:#1f1e1c;--muted:#6b6862;
+  --border:#dedad2;--accent:#c96442;--accent-ink:#ffffff;--ok:#2f7d4f;--ok-bg:#e6f3ea;
+  --bad:#b3372c;--bad-bg:#f8e5e2;--warn:#8a6100;--warn-bg:#fbf1d6;--focus:#c96442;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a1917;--surface:#242320;--surface-2:#2d2b28;--text:#ecebe7;--muted:#a19d95;
+    --border:#3a3834;--accent:#e08a67;--accent-ink:#1a1917;--ok:#6cc08b;--ok-bg:#1f3327;
+    --bad:#ef8a7f;--bad-bg:#3a2320;--warn:#e6c066;--warn-bg:#3a3120;--focus:#e08a67;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a1917;--surface:#242320;--surface-2:#2d2b28;--text:#ecebe7;--muted:#a19d95;
+  --border:#3a3834;--accent:#e08a67;--accent-ink:#1a1917;--ok:#6cc08b;--ok-bg:#1f3327;
+  --bad:#ef8a7f;--bad-bg:#3a2320;--warn:#e6c066;--warn-bg:#3a3120;--focus:#e08a67;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:24px 16px 80px}
+h1{font-size:1.6rem;line-height:1.25;margin:0 0 4px}
+h2{font-size:1.15rem;margin:0 0 12px}
+.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin:16px 0}
+.pill{display:inline-block;font-size:.78rem;padding:2px 10px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+label.field{display:block;margin:12px 0 4px;font-weight:600;font-size:.92rem}
+input[type=text],input[type=email]{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:inherit}
+input:focus-visible,button:focus-visible,.opt:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+button{font:inherit;cursor:pointer;border-radius:8px;padding:10px 18px;border:1px solid var(--border);background:var(--surface-2);color:var(--text)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.55;cursor:not-allowed}
+ul.info{margin:8px 0 0;padding-left:20px}
+.topbar{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border);padding:10px 0}
+.topbar .row{max-width:860px;margin:0 auto;padding:0 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.progress{flex:1;min-width:140px;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden}
+.progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.timer{font-variant-numeric:tabular-nums;font-weight:600}
+.timer.low{color:var(--bad)}
+.q{scroll-margin-top:70px}
+.q .qhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap}
+.q .qtext{font-weight:600;margin:0 0 12px;white-space:pre-wrap}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:8px 0;cursor:pointer;background:var(--bg)}
+.opt input{margin-top:4px;accent-color:var(--accent)}
+.opt.sel{border-color:var(--accent)}
+.opt.correct{border-color:var(--ok);background:var(--ok-bg)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.multi-hint{margin:-4px 0 10px;font-size:.88rem;font-weight:600;color:var(--accent)}
+.explain{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--surface-2);font-size:.93rem}
+code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:4px;word-break:break-word}
+.grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.grid a{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--border);text-decoration:none;color:var(--text);font-size:.85rem;background:var(--surface)}
+.grid a.done{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.grid a.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.grid a.ko{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.score{font-size:2.6rem;font-weight:700;line-height:1}
+.badge{display:inline-block;padding:4px 12px;border-radius:999px;font-weight:700}
+.badge.pass{background:var(--ok-bg);color:var(--ok)}
+.badge.fail{background:var(--bad-bg);color:var(--bad)}
+table{width:100%;border-collapse:collapse;font-size:.93rem}
+th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.status{padding:10px 12px;border-radius:8px;margin-top:12px;font-size:.93rem}
+.status.ok{background:var(--ok-bg);color:var(--ok)}
+.status.bad{background:var(--bad-bg);color:var(--bad)}
+.status.warn{background:var(--warn-bg);color:var(--warn)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.hidden{display:none!important}
+.filter{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.filter button{padding:6px 12px;font-size:.88rem}
+.filter button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+@media (max-width:560px){.score{font-size:2rem}.card{padding:16px}}
+</style>
+</head>
+<body>
+
+<!-- Pantalla de inicio -->
+<div class="wrap" id="start">
+  <span class="pill">__CODE__ · Simulacro de práctica</span>
+  <h1>__TITLE__</h1>
+  <p class="muted">__DESC__</p>
+  <div class="card">
+    <h2>Antes de comenzar</h2>
+    <ul class="info">
+      <li><strong>50 preguntas</strong> de dos tipos: <strong>alternativa única</strong> (una respuesta correcta) y <strong>selección múltiple</strong> (se indica cuántas opciones elegir; solo puntúa si aciertas todas).</li>
+      <li>Tiempo límite: <strong>__MINUTES__ minutos</strong>. Al terminar el tiempo el examen se envía automáticamente.</li>
+      <li>Aprobación: <strong>72 %</strong> (36 de 50), equivalente a la escala 720/1000 del examen oficial.</li>
+      <li>Cada intento sortea 50 preguntas de un banco de __POOL__, manteniendo el peso de cada dominio. El orden de preguntas y respuestas también es aleatorio.</li>
+      <li>Al enviar, el resultado se remite a <strong>__RECIPIENT__</strong>.</li>
+    </ul>
+    <p class="muted" style="font-size:.88rem;margin-top:12px">Dominios evaluados: __DOMAINS__</p>
+    <label class="field" for="cName">Nombre completo</label>
+    <input type="text" id="cName" autocomplete="name" placeholder="Ej. María González">
+    <label class="field" for="cEmail">Correo corporativo</label>
+    <input type="email" id="cEmail" autocomplete="email" placeholder="nombre@empresa.com">
+    <div class="actions"><button class="primary" id="btnStart">Comenzar examen</button></div>
+    <div id="startErr" class="status bad hidden"></div>
+  </div>
+  <p class="muted" style="font-size:.8rem">Material de práctica elaborado para entrenamiento interno. No es contenido oficial de Anthropic ni reproduce preguntas del examen real.</p>
+</div>
+
+<!-- Examen -->
+<div id="exam" class="hidden">
+  <div class="topbar"><div class="row">
+    <strong style="font-size:.95rem">__CODE__</strong>
+    <div class="progress" aria-label="Progreso"><i id="progBar"></i></div>
+    <span id="progTxt" class="muted" style="font-size:.9rem">0/50</span>
+    <span id="timer" class="timer">--:--</span>
+  </div></div>
+  <div class="wrap">
+    <div id="questions"></div>
+    <div class="card">
+      <h2>Navegación</h2>
+      <div class="grid" id="navGrid"></div>
+      <div class="actions"><button class="primary" id="btnSubmit">Enviar examen</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Resultados -->
+<div class="wrap hidden" id="results">
+  <span class="pill">__CODE__ · Resultado</span>
+  <h1>__TITLE__</h1>
+  <div class="card">
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <div><div class="score" id="rScore">0%</div><div class="muted" id="rRaw"></div></div>
+      <div><span class="badge" id="rBadge"></span><div class="muted" id="rMeta" style="margin-top:6px;font-size:.9rem"></div></div>
+    </div>
+    <div id="sendStatus" class="status warn">Enviando resultado a __RECIPIENT__…</div>
+    <div class="actions">
+      <button id="btnRetrySend" class="hidden">Reintentar envío</button>
+      <a id="mailtoLink" class="hidden" style="align-self:center">Enviar con mi cliente de correo</a>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Resultado por dominio</h2>
+    <table><thead><tr><th>Dominio</th><th class="num">Aciertos</th><th class="num">%</th></tr></thead><tbody id="rDomains"></tbody></table>
+  </div>
+  <div class="card">
+    <h2>Revisión de respuestas</h2>
+    <div class="filter">
+      <button data-f="all" class="on">Todas</button>
+      <button data-f="ko">Solo incorrectas</button>
+    </div>
+    <div class="grid" id="rGrid"></div>
+  </div>
+  <div id="review"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var RECIPIENT = "__RECIPIENT__";
+var EXAM = JSON.parse(decodeURIComponent(escape(atob("__DATA__"))));
+var MINUTES = __MINUTES__;
+var PASS = 0.72;
+
+var $ = function(id){ return document.getElementById(id); };
+var state = { name:"", email:"", order:[], answers:{}, start:0, end:0, timerId:null, submitted:false, payload:null };
+
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+// Permite `code` en el texto de las preguntas
+function fmt(s){ return esc(s).replace(/`([^`]+)`/g,"<code>$1</code>"); }
+var LETTERS="ABCDEF";
+// Selección múltiple: q.a es un array; se califica todo o nada
+function isMulti(q){ return Array.isArray(q.a); }
+function has(x,k){ return Array.isArray(x) ? x.indexOf(k)>=0 : x===k; }
+function isCorrect(q,a){
+  if(a===undefined) return false;
+  if(!isMulti(q)) return a===q.a;
+  return a.length===q.a.length && a.every(function(k){ return q.a.indexOf(k)>=0; });
+}
+function optText(q,a){ return Array.isArray(a) ? a.map(function(k){return q.o[k];}).join(" + ") : q.o[a]; }
+function mmss(ms){ var s=Math.max(0,Math.round(ms/1000)); return String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0"); }
+
+$("btnStart").addEventListener("click", function(){
+  var n=$("cName").value.trim(), e=$("cEmail").value.trim(), err=$("startErr");
+  if(n.length<3){ err.textContent="Ingresa tu nombre completo."; err.classList.remove("hidden"); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){ err.textContent="Ingresa un correo válido."; err.classList.remove("hidden"); return; }
+  state.name=n; state.email=e; begin();
+});
+
+// Sortea 50 preguntas del banco respetando la cuota de cada dominio
+function pick(){
+  var chosen=[];
+  EXAM.domains.forEach(function(d){
+    var pool=[]; EXAM.questions.forEach(function(q,i){ if(q.d===d) pool.push(i); });
+    chosen=chosen.concat(shuffle(pool).slice(0, EXAM.quota[d]));
+  });
+  return shuffle(chosen);
+}
+function begin(){
+  state.order = pick().map(function(i){
+    return { idx:i, opts: shuffle(EXAM.questions[i].o.map(function(_,k){return k;})) };
+  });
+  var box=$("questions"), grid=$("navGrid"), html="", g="";
+  state.order.forEach(function(item,n){
+    var q=EXAM.questions[item.idx], multi=isMulti(q);
+    html += '<div class="card q" id="q'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+' de 50</strong><span class="pill">'+esc(q.d)+'</span></div>'+
+      '<p class="qtext">'+fmt(q.q)+'</p>'+
+      (multi ? '<p class="multi-hint">Selección múltiple: selecciona '+q.a.length+' opciones.</p>' : '');
+    item.opts.forEach(function(k,j){
+      html += '<label class="opt" data-n="'+n+'"><input type="'+(multi?"checkbox":"radio")+'" name="r'+n+'" value="'+k+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(q.o[k])+'</span></label>';
+    });
+    html += '</div>';
+    g += '<a href="#q'+n+'" id="nav'+n+'">'+(n+1)+'</a>';
+  });
+  box.innerHTML=html; grid.innerHTML=g;
+  box.addEventListener("change", function(ev){
+    var t=ev.target; if(t.type!=="radio" && t.type!=="checkbox") return;
+    var lab=t.closest(".opt"), n=+lab.dataset.n, card=lab.parentNode;
+    if(t.type==="radio"){
+      state.answers[n]=+t.value;
+    } else {
+      var need=EXAM.questions[state.order[n].idx].a.length;
+      var checked=card.querySelectorAll("input:checked");
+      if(checked.length>need){ t.checked=false; checked=card.querySelectorAll("input:checked"); }
+      var vals=Array.prototype.map.call(checked,function(c){return +c.value;});
+      if(vals.length) state.answers[n]=vals; else delete state.answers[n];
+    }
+    card.querySelectorAll(".opt").forEach(function(o){ o.classList.toggle("sel", o.querySelector("input").checked); });
+    $("nav"+n).classList.toggle("done", state.answers[n]!==undefined);
+    updateProgress();
+  });
+  $("start").classList.add("hidden"); $("exam").classList.remove("hidden");
+  window.scrollTo(0,0);
+  state.start=Date.now(); state.end=state.start+MINUTES*60000;
+  tick(); state.timerId=setInterval(tick,1000);
+  window.addEventListener("beforeunload", guard);
+}
+function guard(e){ if(!state.submitted){ e.preventDefault(); e.returnValue=""; } }
+function updateProgress(){
+  var c=Object.keys(state.answers).length;
+  $("progBar").style.width=(c/50*100)+"%"; $("progTxt").textContent=c+"/50";
+}
+function tick(){
+  var left=state.end-Date.now(), t=$("timer");
+  t.textContent=mmss(left); t.classList.toggle("low", left<5*60000);
+  if(left<=0){ finish(true); }
+}
+
+$("btnSubmit").addEventListener("click", function(){
+  var missing=50-Object.keys(state.answers).length;
+  var msg = missing>0 ? "Tienes "+missing+" pregunta(s) sin responder. ¿Enviar de todos modos?" : "¿Confirmas el envío del examen?";
+  if(confirm(msg)) finish(false);
+});
+
+function finish(timeout){
+  if(state.submitted) return;
+  state.submitted=true; clearInterval(state.timerId);
+  window.removeEventListener("beforeunload", guard);
+  var elapsed=Math.min(Date.now(),state.end)-state.start;
+  var correct=0, doms={}, wrongList=[];
+  EXAM.domains.forEach(function(d){ doms[d]={ok:0,total:0}; });
+  state.order.forEach(function(item,n){
+    var q=EXAM.questions[item.idx], a=state.answers[n], ok=isCorrect(q,a);
+    if(!doms[q.d]) doms[q.d]={ok:0,total:0};
+    doms[q.d].total++; if(ok){ correct++; doms[q.d].ok++; }
+    else wrongList.push("P"+(n+1)+(isMulti(q)?" (múltiple)":"")+" ["+q.d+"] "+q.q.slice(0,90)+(q.q.length>90?"…":"")+" | Resp.: "+(a===undefined?"(sin responder)":optText(q,a))+" | Correcta: "+optText(q,q.a));
+  });
+  var pct=correct/50, passed=pct>=PASS;
+
+  $("exam").classList.add("hidden"); $("results").classList.remove("hidden"); window.scrollTo(0,0);
+  $("rScore").textContent=Math.round(pct*100)+"%";
+  $("rRaw").textContent=correct+" de 50 correctas";
+  var b=$("rBadge"); b.textContent=passed?"APROBADO":"NO APROBADO"; b.className="badge "+(passed?"pass":"fail");
+  $("rMeta").textContent=state.name+" · "+state.email+" · Tiempo: "+mmss(elapsed)+(timeout?" (tiempo agotado)":"");
+
+  var rows="", domTxt=[];
+  Object.keys(doms).forEach(function(d){
+    var x=doms[d], p=x.total?Math.round(x.ok/x.total*100):0;
+    rows+='<tr><td>'+esc(d)+'<div class="bar"><i style="width:'+p+'%"></i></div></td><td class="num">'+x.ok+'/'+x.total+'</td><td class="num">'+p+'%</td></tr>';
+    domTxt.push(d+": "+x.ok+"/"+x.total+" ("+p+"%)");
+  });
+  $("rDomains").innerHTML=rows;
+  renderReview();
+
+  state.payload = {
+    _subject: "Resultado "+EXAM.code+" – "+state.name+" – "+Math.round(pct*100)+"% ("+(passed?"APROBADO":"NO APROBADO")+")",
+    _template: "table",
+    _captcha: "false",
+    Examen: EXAM.title+" ("+EXAM.code+")",
+    Participante: state.name,
+    Correo_participante: state.email,
+    Puntaje: correct+" / 50",
+    Porcentaje: Math.round(pct*100)+"%",
+    Resultado: passed?"APROBADO":"NO APROBADO",
+    Tiempo_utilizado: mmss(elapsed)+(timeout?" (tiempo agotado)":""),
+    Fecha: new Date().toLocaleString("es"),
+    Resultado_por_dominio: domTxt.join(" | "),
+    Preguntas_falladas: wrongList.length? wrongList.join("\n") : "Ninguna"
+  };
+  send();
+}
+
+function renderReview(){
+  var html="", g="";
+  state.order.forEach(function(item,n){
+    var q=EXAM.questions[item.idx], a=state.answers[n], ok=isCorrect(q,a);
+    html+='<div class="card q rv '+(ok?"ok":"ko")+'" id="rv'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+(ok?" ✓":" ✗")+'</strong><span class="pill">'+esc(q.d)+'</span></div><p class="qtext">'+fmt(q.q)+'</p>'+
+      (isMulti(q) ? '<p class="multi-hint">Selección múltiple: '+q.a.length+' respuestas correctas.</p>' : '');
+    item.opts.forEach(function(k,j){
+      var good=has(q.a,k), mine=a!==undefined && has(a,k);
+      var cls = good ? " correct" : (mine ? " wrong" : "");
+      html+='<div class="opt'+cls+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(q.o[k])+(mine?' <em class="muted">(tu respuesta)</em>':'')+'</span></div>';
+    });
+    if(a===undefined) html+='<p class="muted" style="margin:4px 0 0">Sin responder.</p>';
+    html+='<div class="explain"><strong>Explicación:</strong> '+fmt(q.e)+'</div></div>';
+    g+='<a href="#rv'+n+'" class="'+(ok?"ok":"ko")+'">'+(n+1)+'</a>';
+  });
+  $("review").innerHTML=html; $("rGrid").innerHTML=g;
+}
+document.querySelectorAll(".filter button").forEach(function(btn){
+  btn.addEventListener("click", function(){
+    document.querySelectorAll(".filter button").forEach(function(x){x.classList.remove("on");});
+    btn.classList.add("on");
+    var onlyKo=btn.dataset.f==="ko";
+    document.querySelectorAll("#review .rv.ok").forEach(function(c){ c.classList.toggle("hidden", onlyKo); });
+  });
+});
+
+function setStatus(cls,msg){ var s=$("sendStatus"); s.className="status "+cls; s.textContent=msg; }
+function showFallback(){
+  var p=state.payload;
+  var body=["Examen: "+p.Examen,"Participante: "+p.Participante,"Correo: "+p.Correo_participante,"Puntaje: "+p.Puntaje+" ("+p.Porcentaje+")","Resultado: "+p.Resultado,"Tiempo: "+p.Tiempo_utilizado,"Fecha: "+p.Fecha,"","Por dominio:",p.Resultado_por_dominio.split(" | ").join("\n")].join("\n");
+  var l=$("mailtoLink");
+  l.href="mailto:"+RECIPIENT+"?subject="+encodeURIComponent(p._subject)+"&body="+encodeURIComponent(body);
+  l.classList.remove("hidden"); $("btnRetrySend").classList.remove("hidden");
+}
+$("btnRetrySend").addEventListener("click", send);
+
+function send(){
+  setStatus("warn","Enviando resultado a "+RECIPIENT+"…");
+  $("btnRetrySend").classList.add("hidden");
+  fetch("https://formsubmit.co/ajax/"+RECIPIENT, {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Accept":"application/json"},
+    body:JSON.stringify(state.payload)
+  }).then(function(r){ return r.json().catch(function(){ return {success: r.ok ? "true":"false"}; }); })
+    .then(function(j){
+      if(String(j.success)==="true"){ setStatus("ok","✓ Resultado enviado correctamente a "+RECIPIENT+"."); }
+      else { setStatus("bad","No se pudo enviar automáticamente"+(j.message?": "+j.message:"")+". Usa el botón de correo o reintenta."); showFallback(); }
+    })
+    .catch(function(){ setStatus("bad","Sin conexión con el servicio de envío. Usa el botón de correo o reintenta."); showFallback(); });
+}
+})();
+</script>
+</body>
+</html>

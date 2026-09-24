@@ -101,7 +101,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     <label class="field" for="cName">Nombre completo</label>
     <input type="text" id="cName" autocomplete="name" placeholder="Ej. María González">
     <label class="field" for="cEmail">Correo corporativo</label>
-    <input type="email" id="cEmail" autocomplete="email" placeholder="nombre@empresa.com">
+    <input type="email" id="cEmail" autocomplete="email" placeholder="nombre@__DOMAIN__">
+    <p class="muted" style="font-size:.85rem;margin:6px 0 0">Solo se permiten correos @__DOMAIN__.</p>
     <div class="actions"><button class="primary" id="btnStart">Comenzar examen</button></div>
     <div id="startErr" class="status bad hidden"></div>
   </div>
@@ -162,6 +163,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 var RECIPIENT = "__RECIPIENT__";
 var EXAM = JSON.parse(decodeURIComponent(escape(atob("__DATA__"))));
 var MINUTES = __MINUTES__;
+var DOMAIN = "__DOMAIN__";
 var PASS = 0.72;
 
 var $ = function(id){ return document.getElementById(id); };
@@ -187,6 +189,8 @@ $("btnStart").addEventListener("click", function(){
   var n=$("cName").value.trim(), e=$("cEmail").value.trim(), err=$("startErr");
   if(n.length<3){ err.textContent="Ingresa tu nombre completo."; err.classList.remove("hidden"); return; }
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){ err.textContent="Ingresa un correo válido."; err.classList.remove("hidden"); return; }
+  if(e.toLowerCase().split("@")[1]!==DOMAIN){ err.textContent="Debes usar tu correo corporativo @"+DOMAIN+"."; err.classList.remove("hidden"); return; }
+  err.classList.add("hidden");
   state.name=n; state.email=e; begin();
 });
 

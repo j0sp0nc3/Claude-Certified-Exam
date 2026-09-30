@@ -13,7 +13,7 @@ Simulacros de examen para preparar al equipo en las cuatro certificaciones de Cl
 
 ## Cómo funciona
 
-- Solo se puede iniciar con un correo `@nxtara.com` (configurable en `DOMAIN` de `build/build.py`).
+- El correo del participante se valida por formato; acepta cualquier dominio.
 - Cada intento sortea **50 preguntas** del banco de 100, respetando la cuota de cada dominio (10 por dominio; en CCAR-F 13/9/10/10/8 según el peso oficial).
 - Dos tipos de pregunta:
   - **Alternativa única**: 4 opciones, una correcta.
@@ -73,6 +73,6 @@ Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso a
 
 ## Limitaciones
 
-La validación del dominio se hace en el navegador y puede eludirse; para un control real de acceso, activar Cloudflare Access con código de un solo uso (One-time PIN) y la política «Emails ending in @nxtara.com».
+La validación del correo es solo de formato en el navegador. Para restringir quién accede, activar Cloudflare Access con código de un solo uso (One-time PIN).
 
-Las respuestas viajan dentro del HTML (codificadas, no cifradas); una persona con conocimientos técnicos podría verlas. Es adecuado para práctica, no para evaluaciones con valor formal. Para eso conviene mover la corrección y el envío del correo a un Worker con lógica de servidor.
+Las respuestas viajan dentro del HTML (codificadas, no cifradas); una persona con conocimientos técnicos podría verlas. Es adecuado para práctica, no para evaluaciones con valor formal. Para eso conviene mover la corrección y el envío del correo a un Worker con lógica de servidor.\n

@@ -2,7 +2,6 @@ import base64, json, html, pathlib, importlib
 
 RECIPIENT = "jponce@nxtara.com"
 MINUTES = 90
-DOMAIN = "nxtara.com"  # solo se aceptan correos de este dominio
 ROOT = pathlib.Path(__file__).parent
 OUT = ROOT.parent / "examenes"
 OUT.mkdir(exist_ok=True)
@@ -43,7 +42,6 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
                .replace("__DOMAINS__", html.escape(" · ".join(ex["domains"])))
                .replace("__MINUTES__", str(MINUTES))
                .replace("__POOL__", str(len(qs)))
-               .replace("__DOMAIN__", DOMAIN)
                .replace("__RECIPIENT__", RECIPIENT))
     (OUT / ex["file"]).write_text(page, encoding="utf-8")
     cards.append(ex)
@@ -68,4 +66,4 @@ index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta nam
 <div class="grid">{items}</div>
 <p style="font-size:.8rem;margin-top:24px">Material de práctica para entrenamiento interno. No es contenido oficial de Anthropic.</p></div></body></html>"""
 (OUT / "index.html").write_text(index, encoding="utf-8")
-print("OK index.html")
+print("OK index.html")\n

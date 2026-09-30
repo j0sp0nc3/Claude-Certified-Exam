@@ -75,4 +75,4 @@ Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso a
 
 La validación del correo es solo de formato en el navegador. Para restringir quién accede, activar Cloudflare Access con código de un solo uso (One-time PIN).
 
-Las respuestas viajan dentro del HTML (codificadas, no cifradas); una persona con conocimientos técnicos podría verlas. Es adecuado para práctica, no para evaluaciones con valor formal. Para eso conviene mover la corrección y el envío del correo a un Worker con lógica de servidor.\n
+Las respuestas viajan dentro del HTML (codificadas, no cifradas); una persona con conocimientos técnicos podría verlas. Es adecuado para práctica, no para evaluaciones con valor formal. Para eso conviene mover la corrección y el envío del correo a un Worker con lógica de servidor.

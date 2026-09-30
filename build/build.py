@@ -66,4 +66,4 @@ index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta nam
 <div class="grid">{items}</div>
 <p style="font-size:.8rem;margin-top:24px">Material de práctica para entrenamiento interno. No es contenido oficial de Anthropic.</p></div></body></html>"""
 (OUT / "index.html").write_text(index, encoding="utf-8")
-print("OK index.html")\n
+print("OK index.html")

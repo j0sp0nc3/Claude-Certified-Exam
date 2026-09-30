@@ -350,14 +350,25 @@ function send(){
     method:"POST",
     headers:{"Content-Type":"application/json","Accept":"application/json"},
     body:JSON.stringify(state.payload)
-  }).then(function(r){ return r.json().catch(function(){ return {success: r.ok ? "true":"false"}; }); })
-    .then(function(j){
-      if(String(j.success)==="true"){ setStatus("ok","✓ Resultado enviado correctamente a "+RECIPIENT+"."); }
-      else { setStatus("bad","No se pudo enviar automáticamente"+(j.message?": "+j.message:"")+". Usa el botón de correo o reintenta."); showFallback(); }
-    })
-    .catch(function(){ setStatus("bad","Sin conexión con el servicio de envío. Usa el botón de correo o reintenta."); showFallback(); });
+  }).then(function(r){
+    return r.text().then(function(text){
+      var data;
+      try { data = JSON.parse(text); }
+      catch(e) { throw new Error("FormSubmit respondió HTTP "+r.status+" sin JSON: "+text.slice(0,180)); }
+      if(!r.ok || String(data.success)!=="true"){
+        throw new Error("FormSubmit HTTP "+r.status+(data.message?": "+data.message:" respondió que no aceptó el envío."));
+      }
+      return data;
+    });
+  }).then(function(){
+    setStatus("ok","✓ FormSubmit aceptó el resultado para "+RECIPIENT+". Si no llega, revisa activación, spam y cuarentena.");
+  }).catch(function(error){
+    setStatus("bad","No se confirmó el envío: "+(error&&error.message?error.message:"error de conexión")+". Usa el botón de correo o reintenta.");
+    showFallback();
+  });
 }
 })();
 </script>
 </body>
 </html>
+

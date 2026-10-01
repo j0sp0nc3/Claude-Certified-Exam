@@ -44,7 +44,8 @@ ul.info{margin:8px 0 0;padding-left:20px}
 .progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 .timer{font-variant-numeric:tabular-nums;font-weight:600}
 .timer.low{color:var(--bad)}
-.q{scroll-margin-top:70px}
+#questions .q{display:none;scroll-margin-top:70px}
+#questions .q.active{display:block}
 .q .qhead{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px;flex-wrap:wrap}
 .q .qtext{font-weight:600;margin:0 0 12px;white-space:pre-wrap}
 .opt{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:8px 0;cursor:pointer;background:var(--bg)}
@@ -58,6 +59,12 @@ code{font-family:ui-monospace,Consolas,monospace;font-size:.9em;background:var(-
 .grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .grid a{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--border);text-decoration:none;color:var(--text);font-size:.85rem;background:var(--surface)}
 .grid a.done{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.grid a.marked{outline:2px solid var(--warn);outline-offset:1px}
+.grid a.current{box-shadow:0 0 0 2px var(--focus)}
+.question-controls{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0 20px}
+.question-controls .center{display:flex;gap:8px;align-items:center}
+details.nav-panel{margin:12px 0;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+details.nav-panel summary{cursor:pointer;font-weight:600}
 .grid a.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
 .grid a.ko{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
 .score{font-size:2.6rem;font-weight:700;line-height:1}
@@ -91,13 +98,14 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <div class="card">
     <h2>Antes de comenzar</h2>
     <ul class="info">
-      <li><strong>50 preguntas</strong> de dos tipos: <strong>alternativa única</strong> (una respuesta correcta) y <strong>selección múltiple</strong> (se indica cuántas opciones elegir; solo puntúa si aciertas todas).</li>
+      <li><strong>__ITEMS__ preguntas</strong> de dos tipos: <strong>alternativa única</strong> y <strong>selección múltiple</strong> (se indica cuántas opciones elegir; en este simulacro debes acertar el conjunto completo).</li>
       <li>Tiempo límite: <strong>__MINUTES__ minutos</strong>. Al terminar el tiempo el examen se envía automáticamente.</li>
-      <li>Aprobación: <strong>72 %</strong> (36 de 50), equivalente a la escala 720/1000 del examen oficial.</li>
-      <li>Cada intento sortea 50 preguntas de un banco de __POOL__, manteniendo el peso de cada dominio. El orden de preguntas y respuestas también es aleatorio.</li>
+      <li>Umbral interno de práctica: <strong>72 %</strong>. No es una conversión del puntaje escalado oficial.</li>
+      <li>Cada intento sortea preguntas de un banco de __POOL__; el orden de preguntas y respuestas también cambia.</li>
+      <li>El examen oficial se rinde en inglés y es a libro cerrado. Este simulacro está en español y no está supervisado.</li>
       <li>Al enviar, el resultado se remite a <strong>__RECIPIENT__</strong>.</li>
     </ul>
-    <p class="muted" style="font-size:.88rem;margin-top:12px">Dominios evaluados: __DOMAINS__</p>
+    <p class="muted" style="font-size:.88rem;margin-top:12px">Áreas de este banco de práctica: __DOMAINS__</p>
     <label class="field" for="cName">Nombre completo</label>
     <input type="text" id="cName" autocomplete="name" placeholder="Ej. María González">
     <label class="field" for="cEmail">Correo corporativo</label>
@@ -113,14 +121,21 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
   <div class="topbar"><div class="row">
     <strong style="font-size:.95rem">__CODE__</strong>
     <div class="progress" aria-label="Progreso"><i id="progBar"></i></div>
-    <span id="progTxt" class="muted" style="font-size:.9rem">0/50</span>
+    <span id="progTxt" class="muted" style="font-size:.9rem">0/__ITEMS__</span>
     <span id="timer" class="timer">--:--</span>
   </div></div>
   <div class="wrap">
-    <div id="questions"></div>
-    <div class="card">
-      <h2>Navegación</h2>
+    <details class="nav-panel" id="navPanel">
+      <summary>Navegación de preguntas</summary>
       <div class="grid" id="navGrid"></div>
+    </details>
+    <div id="questions"></div>
+    <div class="question-controls">
+      <button id="btnPrev">Anterior</button>
+      <div class="center"><button id="btnMark">Marcar para revisar</button><span id="questionStatus" class="muted"></span></div>
+      <button id="btnNext" class="primary">Siguiente</button>
+    </div>
+    <div class="card">
       <div class="actions"><button class="primary" id="btnSubmit">Enviar examen</button></div>
     </div>
   </div>
@@ -142,7 +157,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
   </div>
   <div class="card">
-    <h2>Resultado por dominio</h2>
+    <h2>Resultado por área del banco</h2>
     <table><thead><tr><th>Dominio</th><th class="num">Aciertos</th><th class="num">%</th></tr></thead><tbody id="rDomains"></tbody></table>
   </div>
   <div class="card">
@@ -165,7 +180,7 @@ var MINUTES = __MINUTES__;
 var PASS = 0.72;
 
 var $ = function(id){ return document.getElementById(id); };
-var state = { name:"", email:"", order:[], answers:{}, start:0, end:0, timerId:null, submitted:false, payload:null };
+var state = { name:"", email:"", order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, submitted:false, payload:null };
 
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
@@ -191,7 +206,7 @@ $("btnStart").addEventListener("click", function(){
   state.name=n; state.email=e; begin();
 });
 
-// Sortea 50 preguntas del banco respetando la cuota de cada dominio
+// Sortea las preguntas del banco respetando la cuota definida para cada área
 function pick(){
   var chosen=[];
   EXAM.domains.forEach(function(d){
@@ -207,14 +222,14 @@ function begin(){
   var box=$("questions"), grid=$("navGrid"), html="", g="";
   state.order.forEach(function(item,n){
     var q=EXAM.questions[item.idx], multi=isMulti(q);
-    html += '<div class="card q" id="q'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+' de 50</strong><span class="pill">'+esc(q.d)+'</span></div>'+
+    html += '<div class="card q" id="q'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+' de '+EXAM.itemCount+'</strong><span class="pill">'+esc(q.d)+'</span></div>'+
       '<p class="qtext">'+fmt(q.q)+'</p>'+
       (multi ? '<p class="multi-hint">Selección múltiple: selecciona '+q.a.length+' opciones.</p>' : '');
     item.opts.forEach(function(k,j){
       html += '<label class="opt" data-n="'+n+'"><input type="'+(multi?"checkbox":"radio")+'" name="r'+n+'" value="'+k+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(q.o[k])+'</span></label>';
     });
     html += '</div>';
-    g += '<a href="#q'+n+'" id="nav'+n+'">'+(n+1)+'</a>';
+    g += '<a href="#q'+n+'" id="nav'+n+'" data-index="'+n+'" aria-label="Ir a pregunta '+(n+1)+'">'+(n+1)+'</a>';
   });
   box.innerHTML=html; grid.innerHTML=g;
   box.addEventListener("change", function(ev){
@@ -230,11 +245,24 @@ function begin(){
       if(vals.length) state.answers[n]=vals; else delete state.answers[n];
     }
     card.querySelectorAll(".opt").forEach(function(o){ o.classList.toggle("sel", o.querySelector("input").checked); });
-    $("nav"+n).classList.toggle("done", state.answers[n]!==undefined);
     updateProgress();
+    updateQuestionStatus();
+  });
+  grid.addEventListener("click", function(ev){
+    var link=ev.target.closest("a[data-index]"); if(!link) return;
+    ev.preventDefault(); showQuestion(+link.dataset.index);
+  });
+  $("btnPrev").addEventListener("click", function(){ showQuestion(state.current-1); });
+  $("btnNext").addEventListener("click", function(){ showQuestion(state.current+1); });
+  $("btnMark").addEventListener("click", function(){
+    if(state.marked[state.current]) delete state.marked[state.current]; else state.marked[state.current]=true;
+    updateQuestionStatus();
+    $("btnMark").textContent=state.marked[state.current]?"Quitar marca":"Marcar para revisar";
+    updateNavigation();
   });
   $("start").classList.add("hidden"); $("exam").classList.remove("hidden");
   window.scrollTo(0,0);
+  showQuestion(0);
   state.start=Date.now(); state.end=state.start+MINUTES*60000;
   tick(); state.timerId=setInterval(tick,1000);
   window.addEventListener("beforeunload", guard);
@@ -242,7 +270,30 @@ function begin(){
 function guard(e){ if(!state.submitted){ e.preventDefault(); e.returnValue=""; } }
 function updateProgress(){
   var c=Object.keys(state.answers).length;
-  $("progBar").style.width=(c/50*100)+"%"; $("progTxt").textContent=c+"/50";
+  $("progBar").style.width=(c/EXAM.itemCount*100)+"%"; $("progTxt").textContent=c+"/"+EXAM.itemCount+" respondidas";
+  updateNavigation();
+}
+function showQuestion(index){
+  if(index<0 || index>=state.order.length) return;
+  state.current=index;
+  document.querySelectorAll("#questions .q").forEach(function(card,i){ card.classList.toggle("active",i===index); });
+  $("btnPrev").disabled=index===0; $("btnNext").disabled=index===state.order.length-1;
+  $("btnNext").textContent=index===state.order.length-1?"Última pregunta":"Siguiente";
+  updateQuestionStatus();
+  $("btnMark").textContent=state.marked[index]?"Quitar marca":"Marcar para revisar";
+  updateNavigation();
+  window.scrollTo(0,0);
+}
+function updateQuestionStatus(){
+  $("questionStatus").textContent=(state.answers[state.current]!==undefined?"Respondida":"Sin responder")+(state.marked[state.current]?" · Marcada para revisar":"");
+}
+function updateNavigation(){
+  state.order.forEach(function(_,i){
+    var link=$("nav"+i); if(!link) return;
+    link.classList.toggle("done",state.answers[i]!==undefined);
+    link.classList.toggle("marked",!!state.marked[i]);
+    link.classList.toggle("current",i===state.current);
+  });
 }
 function tick(){
   var left=state.end-Date.now(), t=$("timer");
@@ -251,7 +302,7 @@ function tick(){
 }
 
 $("btnSubmit").addEventListener("click", function(){
-  var missing=50-Object.keys(state.answers).length;
+  var missing=EXAM.itemCount-Object.keys(state.answers).length;
   var msg = missing>0 ? "Tienes "+missing+" pregunta(s) sin responder. ¿Enviar de todos modos?" : "¿Confirmas el envío del examen?";
   if(confirm(msg)) finish(false);
 });
@@ -269,12 +320,12 @@ function finish(timeout){
     doms[q.d].total++; if(ok){ correct++; doms[q.d].ok++; }
     else wrongList.push("P"+(n+1)+(isMulti(q)?" (múltiple)":"")+" ["+q.d+"] "+q.q.slice(0,90)+(q.q.length>90?"…":"")+" | Resp.: "+(a===undefined?"(sin responder)":optText(q,a))+" | Correcta: "+optText(q,q.a));
   });
-  var pct=correct/50, passed=pct>=PASS;
+  var pct=correct/EXAM.itemCount, passed=pct>=PASS;
 
   $("exam").classList.add("hidden"); $("results").classList.remove("hidden"); window.scrollTo(0,0);
   $("rScore").textContent=Math.round(pct*100)+"%";
-  $("rRaw").textContent=correct+" de 50 correctas";
-  var b=$("rBadge"); b.textContent=passed?"APROBADO":"NO APROBADO"; b.className="badge "+(passed?"pass":"fail");
+  $("rRaw").textContent=correct+" de "+EXAM.itemCount+" correctas · umbral interno de práctica: 72 %";
+  var b=$("rBadge"); b.textContent=passed?"UMBRAL DE PRÁCTICA ALCANZADO":"BAJO EL UMBRAL DE PRÁCTICA"; b.className="badge "+(passed?"pass":"fail");
   $("rMeta").textContent=state.name+" · "+state.email+" · Tiempo: "+mmss(elapsed)+(timeout?" (tiempo agotado)":"");
 
   var rows="", domTxt=[];
@@ -287,18 +338,18 @@ function finish(timeout){
   renderReview();
 
   state.payload = {
-    _subject: "Resultado "+EXAM.code+" – "+state.name+" – "+Math.round(pct*100)+"% ("+(passed?"APROBADO":"NO APROBADO")+")",
+    _subject: "Simulacro "+EXAM.code+" – "+state.name+" – "+Math.round(pct*100)+"% ("+(passed?"umbral alcanzado":"bajo el umbral")+")",
     _template: "table",
     _captcha: "false",
     Examen: EXAM.title+" ("+EXAM.code+")",
     Participante: state.name,
     Correo_participante: state.email,
-    Puntaje: correct+" / 50",
+    Puntaje: correct+" / "+EXAM.itemCount,
     Porcentaje: Math.round(pct*100)+"%",
-    Resultado: passed?"APROBADO":"NO APROBADO",
+    Resultado: passed?"Umbral de práctica alcanzado":"Bajo el umbral de práctica",
     Tiempo_utilizado: mmss(elapsed)+(timeout?" (tiempo agotado)":""),
     Fecha: new Date().toLocaleString("es"),
-    Resultado_por_dominio: domTxt.join(" | "),
+    Resultado_por_area: domTxt.join(" | "),
     Preguntas_falladas: wrongList.length? wrongList.join("\n") : "Ninguna"
   };
   send();
@@ -333,7 +384,7 @@ document.querySelectorAll(".filter button").forEach(function(btn){
 function setStatus(cls,msg){ var s=$("sendStatus"); s.className="status "+cls; s.textContent=msg; }
 function showFallback(){
   var p=state.payload;
-  var body=["Examen: "+p.Examen,"Participante: "+p.Participante,"Correo: "+p.Correo_participante,"Puntaje: "+p.Puntaje+" ("+p.Porcentaje+")","Resultado: "+p.Resultado,"Tiempo: "+p.Tiempo_utilizado,"Fecha: "+p.Fecha,"","Por dominio:",p.Resultado_por_dominio.split(" | ").join("\n")].join("\n");
+  var body=["Examen: "+p.Examen,"Participante: "+p.Participante,"Correo: "+p.Correo_participante,"Puntaje: "+p.Puntaje+" ("+p.Porcentaje+")","Resultado: "+p.Resultado,"Tiempo: "+p.Tiempo_utilizado,"Fecha: "+p.Fecha,"","Por área del banco:",p.Resultado_por_area.split(" | ").join("\n")].join("\n");
   var l=$("mailtoLink");
   l.href="mailto:"+RECIPIENT+"?subject="+encodeURIComponent(p._subject)+"&body="+encodeURIComponent(body);
   l.classList.remove("hidden"); $("btnRetrySend").classList.remove("hidden");

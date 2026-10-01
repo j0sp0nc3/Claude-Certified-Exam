@@ -11,8 +11,8 @@ EXAM = {
   "desc": "Simulacro basado en escenarios para arquitectos de soluciones: diseño de sistemas agénticos, herramientas y MCP, Claude Code en equipos, salida estructurada y confiabilidad en producción.",
   "file": "03-CCAR-F-Architect-Foundations.html",
   "domains": [D1, D2, D3, D4, D5],
-  # Peso por dominio en cada intento de 50 preguntas (27/18/20/20/15 %)
-  "quota": {D1: 13, D2: 9, D3: 10, D4: 10, D5: 8},
+  # Peso por dominio en cada intento de 60 preguntas (27/18/20/20/15 %)
+  "quota": {D1: 16, D2: 11, D3: 12, D4: 12, D5: 9},
   "questions": [
 # ---------- D1 (13) ----------
 (D1, "Un cliente quiere automatizar la clasificación de facturas en 5 categorías fijas con reglas claras. ¿Qué arquitectura recomiendas primero?",

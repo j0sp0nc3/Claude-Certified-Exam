@@ -4,22 +4,23 @@ Simulacros de examen para preparar al equipo en las cuatro certificaciones de Cl
 
 | Archivo | Certificación | Banco | Por intento |
 |---|---|---|---|
-| `examenes/01-CCAO-F-Associate.html` | Claude Certified Associate, Foundations (CCAO-F) | 100 | 50 |
-| `examenes/02-CCDV-F-Developer.html` | Claude Certified Developer, Foundations (CCDV-F) | 100 | 50 |
-| `examenes/03-CCAR-F-Architect-Foundations.html` | Claude Certified Architect, Foundations (CCAR-F) | 100 | 50 |
-| `examenes/04-CCAR-P-Architect-Professional.html` | Claude Certified Architect, Professional (CCAR-P) | 100 | 50 |
+| `examenes/01-CCAO-F-Associate.html` | Claude Certified Associate, Foundations (CCAO-F) | 100 | 60 |
+| `examenes/02-CCDV-F-Developer.html` | Claude Certified Developer, Foundations (CCDV-F) | 100 | 53 |
+| `examenes/03-CCAR-F-Architect-Foundations.html` | Claude Certified Architect, Foundations (CCAR-F) | 100 | 60 |
+| `examenes/04-CCAR-P-Architect-Professional.html` | Claude Certified Architect, Professional (CCAR-P) | 100 | 63 |
 
 > Material de práctica para entrenamiento interno. **No es contenido oficial de Anthropic** ni reproduce preguntas del examen real.
 
 ## Cómo funciona
 
 - El correo del participante se valida por formato; acepta cualquier dominio.
-- Cada intento sortea **50 preguntas** del banco de 100, respetando la cuota de cada dominio (10 por dominio; en CCAR-F 13/9/10/10/8 según el peso oficial).
+- Cada intento sortea la cantidad de preguntas configurada para el examen desde el banco de 100. La distribución usa las cuotas definidas en el generador.
 - Dos tipos de pregunta:
   - **Alternativa única**: 4 opciones, una correcta.
   - **Selección múltiple**: 5 opciones, se indica cuántas elegir (2 o 3). Puntúa solo si se aciertan todas.
-- Orden de preguntas y opciones aleatorio, 90 minutos con envío automático al agotarse el tiempo, aprobación con 72 %.
-- Al finalizar se muestra el puntaje, el resultado por dominio y la revisión con explicaciones.
+- Orden de preguntas y opciones aleatorio; navegación de una pregunta a la vez, botones anterior/siguiente y marca de preguntas para revisar.
+- Tiempo límite de 120 minutos con envío automático al agotarse el tiempo. El 72 % es un umbral interno de práctica y no convierte el puntaje a la escala oficial 720/1000.
+- Al finalizar se muestra el puntaje, el resultado por área del banco y la revisión con explicaciones. El examen oficial es en inglés y a libro cerrado; este simulacro está en español y no está supervisado.
 - El resultado se envía por correo a `jponce@nxtara.com` mediante [FormSubmit](https://formsubmit.co). El primer envío dispara un correo de activación que debe confirmarse. Si el envío falla, la página ofrece enviarlo con el cliente de correo del usuario.
 
 ## Estructura

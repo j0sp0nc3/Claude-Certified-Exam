@@ -1,7 +1,13 @@
 import base64, json, html, pathlib, importlib
 
 RECIPIENT = "jponce@nxtara.com"
-MINUTES = 90
+MINUTES = 120
+ITEM_COUNTS = {
+    "CCAO-F": 60,
+    "CCDV-F": 53,
+    "CCAR-F": 60,
+    "CCAR-P": 63,
+}
 ROOT = pathlib.Path(__file__).parent
 OUT = ROOT.parent / "examenes"
 OUT.mkdir(exist_ok=True)
@@ -11,8 +17,13 @@ cards = []
 for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_architect_p"]:
     ex = importlib.import_module(mod).EXAM
     qs = ex["questions"] + importlib.import_module(mod + "_2").QUESTIONS
-    quota = ex.get("quota") or {d: 10 for d in ex["domains"]}
-    assert sum(quota.values()) == 50, mod
+    item_count = ITEM_COUNTS[ex["code"]]
+    if ex.get("quota"):
+        quota = ex["quota"]
+    else:
+        base, remainder = divmod(item_count, len(ex["domains"]))
+        quota = {d: base + (i < remainder) for i, d in enumerate(ex["domains"])}
+    assert sum(quota.values()) == item_count, mod
     assert len(qs) == 100, (mod, len(qs))
     assert len({x[1] for x in qs}) == 100, (mod, "pregunta duplicada")
 
@@ -32,6 +43,7 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
     multi = sum(1 for x in qs if isinstance(x[2], list))
     data = {
         "code": ex["code"], "title": ex["title"], "domains": ex["domains"], "quota": quota,
+        "itemCount": item_count,
         "questions": [to_q(*x) for x in qs],
     }
     b64 = base64.b64encode(json.dumps(data, ensure_ascii=False).encode("utf-8")).decode()
@@ -41,6 +53,7 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
                .replace("__DESC__", html.escape(ex["desc"]))
                .replace("__DOMAINS__", html.escape(" · ".join(ex["domains"])))
                .replace("__MINUTES__", str(MINUTES))
+               .replace("__ITEMS__", str(item_count))
                .replace("__POOL__", str(len(qs)))
                .replace("__RECIPIENT__", RECIPIENT))
     (OUT / ex["file"]).write_text(page, encoding="utf-8")
@@ -62,7 +75,7 @@ index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta nam
 .card:hover{{border-color:var(--accent)}}.card h2{{font-size:1.1rem;margin:10px 0 6px}}.card p{{font-size:.92rem;margin:0 0 12px}}
 .pill{{font-size:.78rem;padding:2px 10px;border-radius:999px;background:var(--pill);color:var(--muted)}}.go{{color:var(--accent);font-weight:600}}
 </style></head><body><div class="wrap"><h1>Simulacros de Certificación Claude</h1>
-<p>Cuatro exámenes de práctica. Cada intento sortea 50 preguntas de un banco de 100, con alternativa única y selección múltiple. {MINUTES} minutos, aprobación 72 %. Los resultados se envían a {RECIPIENT}.</p>
+<p>Simulacros de práctica en español con duración de {MINUTES} minutos. Cada examen usa la cantidad de preguntas de su formato de referencia y sortea desde un banco de 100. El umbral interno de práctica es 72 %; no equivale a la puntuación escalada oficial. Los resultados se envían a {RECIPIENT}.</p>
 <div class="grid">{items}</div>
 <p style="font-size:.8rem;margin-top:24px">Material de práctica para entrenamiento interno. No es contenido oficial de Anthropic.</p></div></body></html>"""
 (OUT / "index.html").write_text(index, encoding="utf-8")

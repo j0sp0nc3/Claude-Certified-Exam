@@ -1,0 +1,2 @@
+ALTER TABLE attempts ADD COLUMN current_question INTEGER;
+ALTER TABLE attempts ADD COLUMN marked_count INTEGER NOT NULL DEFAULT 0;

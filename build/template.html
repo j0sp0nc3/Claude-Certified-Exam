@@ -103,7 +103,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <li>Umbral interno de práctica: <strong>72 %</strong>. No es una conversión del puntaje escalado oficial.</li>
       <li>Cada intento sortea preguntas de un banco de __POOL__; el orden de preguntas y respuestas también cambia.</li>
       <li>El examen oficial se rinde en inglés y es a libro cerrado. Este simulacro está en español y no está supervisado.</li>
-      <li>El avance se guarda durante el examen y el resultado al finalizar. El equipo administrador puede consultarlos en un panel privado.</li>
+      <li>El panel privado permite observar en línea tu avance, pregunta actual, marcas y tiempo. Las respuestas no se muestran durante el examen.</li>
     </ul>
     <p class="muted" style="font-size:.88rem;margin-top:12px">Áreas de este banco de práctica: __DOMAINS__</p>
     <label class="field" for="cName">Nombre completo</label>
@@ -267,7 +267,7 @@ function begin(){
   window.scrollTo(0,0);
   showQuestion(0);
   state.start=Date.now(); state.end=state.start+MINUTES*60000;
-  saveAttempt("in_progress");
+    saveAttempt("in_progress");
   state.heartbeatId=setInterval(function(){ saveAttempt(state.submitted?"completed":"in_progress"); },30000);
   tick(); state.timerId=setInterval(tick,1000);
   window.addEventListener("beforeunload", guard);
@@ -288,6 +288,7 @@ function showQuestion(index){
   $("btnMark").textContent=state.marked[index]?"Quitar marca":"Marcar para revisar";
   updateNavigation();
   window.scrollTo(0,0);
+  scheduleSave();
 }
 function updateQuestionStatus(){
   $("questionStatus").textContent=(state.answers[state.current]!==undefined?"Respondida":"Sin responder")+(state.marked[state.current]?" · Marcada para revisar":"");
@@ -344,6 +345,7 @@ function finish(timeout){
   state.payload = { attemptId:state.attemptId, examCode:EXAM.code, participantName:state.name,
     email:state.email, status:"completed", startedAt:state.startedAt, questionCount:EXAM.itemCount,
     answeredCount:Object.keys(state.answers).length, elapsedSeconds:Math.floor(elapsed/1000),
+    currentQuestion:state.current+1, markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
     correctCount:correct, scorePercent:Math.round(pct*100),
     resultLabel:passed?"Umbral de práctica alcanzado":"Bajo el umbral de práctica",
     answers:state.answers, marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),
@@ -388,6 +390,7 @@ function saveAttempt(status){
   var data=status==="completed"?state.payload:{attemptId:state.attemptId,examCode:EXAM.code,
     participantName:state.name,email:state.email,status:"in_progress",startedAt:state.startedAt,
     questionCount:EXAM.itemCount,answeredCount:Object.keys(state.answers).length,elapsedSeconds:elapsed,
+    currentQuestion:state.current+1,markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
     answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number)};
   if(!data) return Promise.resolve();
   state.saveQueue=state.saveQueue.catch(function(){}).then(function(){

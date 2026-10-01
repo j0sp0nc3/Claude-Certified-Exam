@@ -33,6 +33,7 @@ async function saveAttempt(request, env) {
   if (typeof r.startedAt !== "string" || Number.isNaN(Date.parse(r.startedAt))) return json({ error: "Fecha no válida." }, 400);
   if (!["in_progress", "completed"].includes(r.status)) return json({ error: "Estado no válido." }, 400);
   if (!Number.isInteger(r.questionCount) || r.questionCount < 1 || r.questionCount > 100 || !Number.isInteger(r.answeredCount) || r.answeredCount < 0 || r.answeredCount > r.questionCount) return json({ error: "Avance no válido." }, 400);
+  if (!Number.isInteger(r.currentQuestion) || r.currentQuestion < 1 || r.currentQuestion > r.questionCount || !Number.isInteger(r.markedCount) || r.markedCount < 0 || r.markedCount > r.questionCount) return json({ error: "Estado de navegación no válido." }, 400);
   if (!Number.isInteger(r.elapsedSeconds) || r.elapsedSeconds < 0 || r.elapsedSeconds > 86400) return json({ error: "Tiempo no válido." }, 400);
   if (r.status === "completed" && (!Number.isInteger(r.correctCount) || r.correctCount < 0 || r.correctCount > r.questionCount || !Number.isFinite(r.scorePercent) || r.scorePercent < 0 || r.scorePercent > 100)) return json({ error: "Puntaje no válido." }, 400);
 
@@ -40,20 +41,21 @@ async function saveAttempt(request, env) {
     await env.DB.prepare(`
       INSERT INTO attempts (
         attempt_id, exam_code, participant_name, email, status, started_at, updated_at,
-        finished_at, question_count, answered_count, elapsed_seconds, correct_count,
+        finished_at, question_count, answered_count, elapsed_seconds, current_question, marked_count, correct_count,
         score_percent, result_label, answers_json, marked_json, areas_json
-      ) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(attempt_id) DO UPDATE SET
         participant_name=excluded.participant_name, email=excluded.email, status=excluded.status,
         updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), finished_at=excluded.finished_at,
         answered_count=excluded.answered_count, elapsed_seconds=excluded.elapsed_seconds,
+        current_question=excluded.current_question, marked_count=excluded.marked_count,
         correct_count=excluded.correct_count, score_percent=excluded.score_percent,
         result_label=excluded.result_label, answers_json=excluded.answers_json,
         marked_json=excluded.marked_json, areas_json=excluded.areas_json
       WHERE attempts.status != 'completed' OR excluded.status = 'completed'
     `).bind(r.attemptId, r.examCode, r.participantName.trim(), r.email.trim(), r.status,
       r.startedAt, r.status === "completed" ? new Date().toISOString() : null,
-      r.questionCount, r.answeredCount, r.elapsedSeconds,
+      r.questionCount, r.answeredCount, r.elapsedSeconds, r.currentQuestion, r.markedCount,
       r.status === "completed" ? r.correctCount : null,
       r.status === "completed" ? r.scorePercent : null,
       r.status === "completed" ? String(r.resultLabel || "") : null,
@@ -73,6 +75,7 @@ async function listAttempts(request, env) {
   try {
     const rows = await env.DB.prepare(`SELECT attempt_id, exam_code, participant_name, email, status,
       started_at, updated_at, finished_at, question_count, answered_count, elapsed_seconds,
+      current_question, marked_count,
       correct_count, score_percent, result_label, areas_json FROM attempts ORDER BY started_at DESC LIMIT 2000`).all();
     return json({ attempts: rows.results || [] });
   } catch (error) {

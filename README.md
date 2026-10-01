@@ -22,7 +22,7 @@ Simulacros de examen para preparar al equipo en las cuatro certificaciones de Cl
 - Tiempo límite de 120 minutos con envío automático al agotarse el tiempo. El 72 % es un umbral interno de práctica y no convierte el puntaje a la escala oficial 720/1000.
 - Al finalizar se muestra el puntaje, el resultado por área del banco y la revisión con explicaciones. El examen oficial es en inglés y a libro cerrado; este simulacro está en español y no está supervisado.
 - El avance se guarda mientras la persona responde y el resultado al terminar se conserva en Cloudflare D1.
-- El panel privado en `/admin.html` permite revisar avances y resultados, filtrar y descargar CSV.
+- El panel privado `/admin.html` se actualiza cada cinco segundos y permite observar quién está conectado, la pregunta actual, el avance, las marcas y los tiempos. No muestra las respuestas elegidas durante el examen.
 
 ## Estructura
 
@@ -68,13 +68,13 @@ Sitio: https://claude-certified-exam.beroiza79.workers.dev/
 
 ### Registro y consulta de resultados
 
-La base D1 `claude-exam-results` está enlazada en `wrangler.jsonc`. Inicializa sus tablas desde una terminal autenticada con:
+La base D1 `claude-exam-results` está enlazada en `wrangler.jsonc`. Aplica las migraciones desde una terminal autenticada con:
 
 ```bash
 npx wrangler d1 migrations apply claude-exam-results --remote
 ```
 
-También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** → **Console** y ejecutar el contenido de `migrations/0001_attempts.sql`.
+También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** → **Console** y ejecutar el contenido de los archivos de `migrations/` en orden.
 
 Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos o exportarlos a CSV.
 
@@ -91,4 +91,4 @@ Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso a
 
 La validación del correo es solo de formato en el navegador. Para restringir quién accede, activar Cloudflare Access con código de un solo uso (One-time PIN).
 
-Las respuestas viajan dentro del HTML (codificadas, no cifradas); una persona con conocimientos técnicos podría verlas. Es adecuado para práctica, no para evaluaciones con valor formal. Para eso conviene mover la corrección y el envío del correo a un Worker con lógica de servidor.
+Las respuestas correctas viajan dentro del HTML y la puntuación se calcula en el navegador; una persona con conocimientos técnicos podría verlas o alterar un resultado. El panel sirve para seguimiento de práctica, no para una evaluación formal supervisada.

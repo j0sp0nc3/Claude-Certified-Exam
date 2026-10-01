@@ -27,13 +27,15 @@ async function saveAttempt(request, env) {
     r = JSON.parse(raw);
   } catch { return json({ error: "JSON no válido." }, 400); }
 
+  const currentQuestion = Number.isInteger(r.currentQuestion) ? r.currentQuestion : 1;
+  const markedCount = Number.isInteger(r.markedCount) ? r.markedCount : (Array.isArray(r.marked) ? r.marked.length : 0);
   if (!validId(r.attemptId) || !EXAM_CODES.has(r.examCode)) return json({ error: "Intento o examen no válido." }, 400);
   if (typeof r.participantName !== "string" || r.participantName.trim().length < 3 || r.participantName.length > 120) return json({ error: "Nombre no válido." }, 400);
   if (typeof r.email !== "string" || r.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return json({ error: "Correo no válido." }, 400);
   if (typeof r.startedAt !== "string" || Number.isNaN(Date.parse(r.startedAt))) return json({ error: "Fecha no válida." }, 400);
   if (!["in_progress", "completed"].includes(r.status)) return json({ error: "Estado no válido." }, 400);
   if (!Number.isInteger(r.questionCount) || r.questionCount < 1 || r.questionCount > 100 || !Number.isInteger(r.answeredCount) || r.answeredCount < 0 || r.answeredCount > r.questionCount) return json({ error: "Avance no válido." }, 400);
-  if (!Number.isInteger(r.currentQuestion) || r.currentQuestion < 1 || r.currentQuestion > r.questionCount || !Number.isInteger(r.markedCount) || r.markedCount < 0 || r.markedCount > r.questionCount) return json({ error: "Estado de navegación no válido." }, 400);
+  if (currentQuestion < 1 || currentQuestion > r.questionCount || markedCount < 0 || markedCount > r.questionCount) return json({ error: "Estado de navegación no válido." }, 400);
   if (!Number.isInteger(r.elapsedSeconds) || r.elapsedSeconds < 0 || r.elapsedSeconds > 86400) return json({ error: "Tiempo no válido." }, 400);
   if (r.status === "completed" && (!Number.isInteger(r.correctCount) || r.correctCount < 0 || r.correctCount > r.questionCount || !Number.isFinite(r.scorePercent) || r.scorePercent < 0 || r.scorePercent > 100)) return json({ error: "Puntaje no válido." }, 400);
 
@@ -55,7 +57,7 @@ async function saveAttempt(request, env) {
       WHERE attempts.status != 'completed' OR excluded.status = 'completed'
     `).bind(r.attemptId, r.examCode, r.participantName.trim(), r.email.trim(), r.status,
       r.startedAt, r.status === "completed" ? new Date().toISOString() : null,
-      r.questionCount, r.answeredCount, r.elapsedSeconds, r.currentQuestion, r.markedCount,
+      r.questionCount, r.answeredCount, r.elapsedSeconds, currentQuestion, markedCount,
       r.status === "completed" ? r.correctCount : null,
       r.status === "completed" ? r.scorePercent : null,
       r.status === "completed" ? String(r.resultLabel || "") : null,

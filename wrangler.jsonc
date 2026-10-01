@@ -2,13 +2,24 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // Debe coincidir con el nombre del Worker conectado en Cloudflare (Workers Builds)
   "name": "claude-certified-exam",
+  "main": "src/index.js",
   "compatibility_date": "2026-09-01",
   "workers_dev": true,
   "preview_urls": true,
   // Worker solo de archivos estáticos: sirve la carpeta examenes/ (index.html en la raíz)
   "assets": {
     "directory": "./examenes",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "claude-exam-results",
+      "database_id": "9e9b298d-375d-4a96-9dc6-01b339be6307",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

@@ -103,7 +103,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <li>Umbral interno de práctica: <strong>72 %</strong>. No es una conversión del puntaje escalado oficial.</li>
       <li>Cada intento sortea preguntas de un banco de __POOL__; el orden de preguntas y respuestas también cambia.</li>
       <li>El examen oficial se rinde en inglés y es a libro cerrado. Este simulacro está en español y no está supervisado.</li>
-      <li>Al enviar, el resultado se remite a <strong>__RECIPIENT__</strong>.</li>
+      <li>El avance se guarda durante el examen y el resultado al finalizar. El equipo administrador puede consultarlos en un panel privado.</li>
     </ul>
     <p class="muted" style="font-size:.88rem;margin-top:12px">Áreas de este banco de práctica: __DOMAINS__</p>
     <label class="field" for="cName">Nombre completo</label>
@@ -136,6 +136,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <button id="btnNext" class="primary">Siguiente</button>
     </div>
     <div class="card">
+      <div id="saveStatus" class="status warn">El avance se guardará al comenzar.</div>
       <div class="actions"><button class="primary" id="btnSubmit">Enviar examen</button></div>
     </div>
   </div>
@@ -150,10 +151,9 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <div><div class="score" id="rScore">0%</div><div class="muted" id="rRaw"></div></div>
       <div><span class="badge" id="rBadge"></span><div class="muted" id="rMeta" style="margin-top:6px;font-size:.9rem"></div></div>
     </div>
-    <div id="sendStatus" class="status warn">Enviando resultado a __RECIPIENT__…</div>
+    <div id="sendStatus" class="status warn">Guardando resultado…</div>
     <div class="actions">
-      <button id="btnRetrySend" class="hidden">Reintentar envío</button>
-      <a id="mailtoLink" class="hidden" style="align-self:center">Enviar con mi cliente de correo</a>
+      <button id="btnRetrySend" class="hidden">Reintentar guardado</button>
     </div>
   </div>
   <div class="card">
@@ -174,13 +174,12 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <script>
 (function(){
 "use strict";
-var RECIPIENT = "__RECIPIENT__";
 var EXAM = JSON.parse(decodeURIComponent(escape(atob("__DATA__"))));
 var MINUTES = __MINUTES__;
 var PASS = 0.72;
 
 var $ = function(id){ return document.getElementById(id); };
-var state = { name:"", email:"", order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, submitted:false, payload:null };
+var state = { name:"", email:"", attemptId:"", startedAt:"", order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, heartbeatId:null, saveTimer:null, saveQueue:Promise.resolve(), submitted:false, payload:null };
 
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
@@ -216,6 +215,8 @@ function pick(){
   return shuffle(chosen);
 }
 function begin(){
+  state.attemptId=crypto.randomUUID();
+  state.startedAt=new Date().toISOString();
   state.order = pick().map(function(i){
     return { idx:i, opts: shuffle(EXAM.questions[i].o.map(function(_,k){return k;})) };
   });
@@ -247,6 +248,7 @@ function begin(){
     card.querySelectorAll(".opt").forEach(function(o){ o.classList.toggle("sel", o.querySelector("input").checked); });
     updateProgress();
     updateQuestionStatus();
+    scheduleSave();
   });
   grid.addEventListener("click", function(ev){
     var link=ev.target.closest("a[data-index]"); if(!link) return;
@@ -259,11 +261,14 @@ function begin(){
     updateQuestionStatus();
     $("btnMark").textContent=state.marked[state.current]?"Quitar marca":"Marcar para revisar";
     updateNavigation();
+    scheduleSave();
   });
   $("start").classList.add("hidden"); $("exam").classList.remove("hidden");
   window.scrollTo(0,0);
   showQuestion(0);
   state.start=Date.now(); state.end=state.start+MINUTES*60000;
+  saveAttempt("in_progress");
+  state.heartbeatId=setInterval(function(){ saveAttempt(state.submitted?"completed":"in_progress"); },30000);
   tick(); state.timerId=setInterval(tick,1000);
   window.addEventListener("beforeunload", guard);
 }
@@ -309,16 +314,15 @@ $("btnSubmit").addEventListener("click", function(){
 
 function finish(timeout){
   if(state.submitted) return;
-  state.submitted=true; clearInterval(state.timerId);
+  state.submitted=true; clearInterval(state.timerId); clearInterval(state.heartbeatId); clearTimeout(state.saveTimer);
   window.removeEventListener("beforeunload", guard);
   var elapsed=Math.min(Date.now(),state.end)-state.start;
-  var correct=0, doms={}, wrongList=[];
+  var correct=0, doms={};
   EXAM.domains.forEach(function(d){ doms[d]={ok:0,total:0}; });
   state.order.forEach(function(item,n){
     var q=EXAM.questions[item.idx], a=state.answers[n], ok=isCorrect(q,a);
     if(!doms[q.d]) doms[q.d]={ok:0,total:0};
     doms[q.d].total++; if(ok){ correct++; doms[q.d].ok++; }
-    else wrongList.push("P"+(n+1)+(isMulti(q)?" (múltiple)":"")+" ["+q.d+"] "+q.q.slice(0,90)+(q.q.length>90?"…":"")+" | Resp.: "+(a===undefined?"(sin responder)":optText(q,a))+" | Correcta: "+optText(q,q.a));
   });
   var pct=correct/EXAM.itemCount, passed=pct>=PASS;
 
@@ -337,21 +341,13 @@ function finish(timeout){
   $("rDomains").innerHTML=rows;
   renderReview();
 
-  state.payload = {
-    _subject: "Simulacro "+EXAM.code+" – "+state.name+" – "+Math.round(pct*100)+"% ("+(passed?"umbral alcanzado":"bajo el umbral")+")",
-    _template: "table",
-    _captcha: "false",
-    Examen: EXAM.title+" ("+EXAM.code+")",
-    Participante: state.name,
-    Correo_participante: state.email,
-    Puntaje: correct+" / "+EXAM.itemCount,
-    Porcentaje: Math.round(pct*100)+"%",
-    Resultado: passed?"Umbral de práctica alcanzado":"Bajo el umbral de práctica",
-    Tiempo_utilizado: mmss(elapsed)+(timeout?" (tiempo agotado)":""),
-    Fecha: new Date().toLocaleString("es"),
-    Resultado_por_area: domTxt.join(" | "),
-    Preguntas_falladas: wrongList.length? wrongList.join("\n") : "Ninguna"
-  };
+  state.payload = { attemptId:state.attemptId, examCode:EXAM.code, participantName:state.name,
+    email:state.email, status:"completed", startedAt:state.startedAt, questionCount:EXAM.itemCount,
+    answeredCount:Object.keys(state.answers).length, elapsedSeconds:Math.floor(elapsed/1000),
+    correctCount:correct, scorePercent:Math.round(pct*100),
+    resultLabel:passed?"Umbral de práctica alcanzado":"Bajo el umbral de práctica",
+    answers:state.answers, marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),
+    areas:doms };
   send();
 }
 
@@ -382,39 +378,38 @@ document.querySelectorAll(".filter button").forEach(function(btn){
 });
 
 function setStatus(cls,msg){ var s=$("sendStatus"); s.className="status "+cls; s.textContent=msg; }
-function showFallback(){
-  var p=state.payload;
-  var body=["Examen: "+p.Examen,"Participante: "+p.Participante,"Correo: "+p.Correo_participante,"Puntaje: "+p.Puntaje+" ("+p.Porcentaje+")","Resultado: "+p.Resultado,"Tiempo: "+p.Tiempo_utilizado,"Fecha: "+p.Fecha,"","Por área del banco:",p.Resultado_por_area.split(" | ").join("\n")].join("\n");
-  var l=$("mailtoLink");
-  l.href="mailto:"+RECIPIENT+"?subject="+encodeURIComponent(p._subject)+"&body="+encodeURIComponent(body);
-  l.classList.remove("hidden"); $("btnRetrySend").classList.remove("hidden");
+function scheduleSave(){
+  if(state.submitted) return;
+  clearTimeout(state.saveTimer);
+  state.saveTimer=setTimeout(function(){ saveAttempt("in_progress"); },700);
+}
+function saveAttempt(status){
+  var elapsed=Math.max(0,Math.floor((Date.now()-state.start)/1000));
+  var data=status==="completed"?state.payload:{attemptId:state.attemptId,examCode:EXAM.code,
+    participantName:state.name,email:state.email,status:"in_progress",startedAt:state.startedAt,
+    questionCount:EXAM.itemCount,answeredCount:Object.keys(state.answers).length,elapsedSeconds:elapsed,
+    answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number)};
+  if(!data) return Promise.resolve();
+  state.saveQueue=state.saveQueue.catch(function(){}).then(function(){
+    return fetch("/api/attempts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data),keepalive:true})
+      .then(function(r){return r.json().then(function(d){if(!r.ok) throw new Error(d.error||"HTTP "+r.status);return d;});});
+  });
+  return state.saveQueue.then(function(){
+    if(status==="completed") setStatus("ok","Resultado guardado correctamente. El equipo puede verlo en el panel privado.");
+    else { $("saveStatus").className="status ok"; $("saveStatus").textContent="Avance guardado · "+new Date().toLocaleTimeString("es"); }
+  }).catch(function(error){
+    if(status==="completed") { setStatus("bad","No se pudo guardar el resultado: "+error.message+". Reintenta el guardado."); $("btnRetrySend").classList.remove("hidden"); }
+    else { $("saveStatus").className="status bad"; $("saveStatus").textContent="No se pudo guardar el avance; se reintentará al responder."; }
+  });
 }
 $("btnRetrySend").addEventListener("click", send);
 
 function send(){
-  setStatus("warn","Enviando resultado a "+RECIPIENT+"…");
+  setStatus("warn","Guardando resultado…");
   $("btnRetrySend").classList.add("hidden");
-  fetch("https://formsubmit.co/ajax/"+RECIPIENT, {
-    method:"POST",
-    headers:{"Content-Type":"application/json","Accept":"application/json"},
-    body:JSON.stringify(state.payload)
-  }).then(function(r){
-    return r.text().then(function(text){
-      var data;
-      try { data = JSON.parse(text); }
-      catch(e) { throw new Error("FormSubmit respondió HTTP "+r.status+" sin JSON: "+text.slice(0,180)); }
-      if(!r.ok || String(data.success)!=="true"){
-        throw new Error("FormSubmit HTTP "+r.status+(data.message?": "+data.message:" respondió que no aceptó el envío."));
-      }
-      return data;
-    });
-  }).then(function(){
-    setStatus("ok","✓ FormSubmit aceptó el resultado para "+RECIPIENT+". Si no llega, revisa activación, spam y cuarentena.");
-  }).catch(function(error){
-    setStatus("bad","No se confirmó el envío: "+(error&&error.message?error.message:"error de conexión")+". Usa el botón de correo o reintenta.");
-    showFallback();
-  });
+  saveAttempt("completed");
 }
+window.addEventListener("pagehide",function(){if(state.attemptId&&!state.submitted) saveAttempt("in_progress");});
 })();
 </script>
 </body>

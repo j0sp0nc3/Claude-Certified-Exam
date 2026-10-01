@@ -21,7 +21,8 @@ Simulacros de examen para preparar al equipo en las cuatro certificaciones de Cl
 - Orden de preguntas y opciones aleatorio; navegación de una pregunta a la vez, botones anterior/siguiente y marca de preguntas para revisar.
 - Tiempo límite de 120 minutos con envío automático al agotarse el tiempo. El 72 % es un umbral interno de práctica y no convierte el puntaje a la escala oficial 720/1000.
 - Al finalizar se muestra el puntaje, el resultado por área del banco y la revisión con explicaciones. El examen oficial es en inglés y a libro cerrado; este simulacro está en español y no está supervisado.
-- El resultado se envía por correo a `jponce@nxtara.com` mediante [FormSubmit](https://formsubmit.co). El primer envío dispara un correo de activación que debe confirmarse. Si el envío falla, la página ofrece enviarlo con el cliente de correo del usuario.
+- El avance se guarda mientras la persona responde y el resultado al terminar se conserva en Cloudflare D1.
+- El panel privado en `/admin.html` permite revisar avances y resultados, filtrar y descargar CSV.
 
 ## Estructura
 
@@ -33,6 +34,8 @@ build/
   build.py               # Genera examenes/*.html
 examenes/                # HTML generados (lo que se publica)
 wrangler.jsonc           # Despliegue como Cloudflare Worker (assets estáticos)
+src/index.js             # API de registro y consulta protegida
+migrations/              # Esquema de la base D1
 ```
 
 ## Editar preguntas
@@ -62,6 +65,18 @@ El script valida que haya 100 preguntas por examen, sin duplicados, y suficiente
 El repositorio está conectado a Cloudflare Workers Builds: cada push a `main` ejecuta `npx wrangler deploy` y publica automáticamente.
 
 Sitio: https://claude-certified-exam.beroiza79.workers.dev/
+
+### Registro y consulta de resultados
+
+La base D1 `claude-exam-results` está enlazada en `wrangler.jsonc`. Inicializa sus tablas desde una terminal autenticada con:
+
+```bash
+npx wrangler d1 migrations apply claude-exam-results --remote
+```
+
+También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** → **Console** y ejecutar el contenido de `migrations/0001_attempts.sql`.
+
+Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos o exportarlos a CSV.
 
 Despliegue manual (opcional):
 

@@ -1,6 +1,5 @@
 import base64, json, html, pathlib, importlib
 
-RECIPIENT = "jponce@nxtara.com"
 MINUTES = 120
 ITEM_COUNTS = {
     "CCAO-F": 60,
@@ -54,8 +53,7 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
                .replace("__DOMAINS__", html.escape(" · ".join(ex["domains"])))
                .replace("__MINUTES__", str(MINUTES))
                .replace("__ITEMS__", str(item_count))
-               .replace("__POOL__", str(len(qs)))
-               .replace("__RECIPIENT__", RECIPIENT))
+               .replace("__POOL__", str(len(qs))))
     (OUT / ex["file"]).write_text(page, encoding="utf-8")
     cards.append(ex)
     print("OK", ex["file"], f"banco={len(qs)} multiple={multi}")
@@ -75,7 +73,7 @@ index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta nam
 .card:hover{{border-color:var(--accent)}}.card h2{{font-size:1.1rem;margin:10px 0 6px}}.card p{{font-size:.92rem;margin:0 0 12px}}
 .pill{{font-size:.78rem;padding:2px 10px;border-radius:999px;background:var(--pill);color:var(--muted)}}.go{{color:var(--accent);font-weight:600}}
 </style></head><body><div class="wrap"><h1>Simulacros de Certificación Claude</h1>
-<p>Simulacros de práctica en español con duración de {MINUTES} minutos. Cada examen usa la cantidad de preguntas de su formato de referencia y sortea desde un banco de 100. El umbral interno de práctica es 72 %; no equivale a la puntuación escalada oficial. Los resultados se envían a {RECIPIENT}.</p>
+<p>Simulacros de práctica en español con duración de {MINUTES} minutos. Cada examen usa la cantidad de preguntas de su formato de referencia y sortea desde un banco de 100. El umbral interno de práctica es 72 %; no equivale a la puntuación escalada oficial. El avance y los resultados se guardan en el panel privado.</p>
 <div class="grid">{items}</div>
 <p style="font-size:.8rem;margin-top:24px">Material de práctica para entrenamiento interno. No es contenido oficial de Anthropic.</p></div></body></html>"""
 (OUT / "index.html").write_text(index, encoding="utf-8")

@@ -76,7 +76,9 @@ npx wrangler d1 migrations apply claude-exam-results --remote
 
 También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** → **Console** y ejecutar el contenido de los archivos de `migrations/` en orden.
 
-Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos o exportarlos a CSV.
+Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos, exportarlos a CSV y configurar la admisión.
+
+En el panel privado, **Admisión al examen** permite establecer el dominio corporativo y una lista opcional de correos exactos (separados por comas o saltos de línea). Un participante puede iniciar si coincide con el dominio o con una dirección exacta. La regla se valida en el Worker antes de iniciar y al guardar el avance. El valor inicial es `nxtara.com` sin excepciones exactas; modifica y guarda la regla desde el panel. Un campo de correo no verifica quién es su dueño: para comprobar identidad, protege también el sitio con Cloudflare Access y One-time PIN.
 
 Despliegue manual (opcional):
 
@@ -89,6 +91,6 @@ Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso a
 
 ## Limitaciones
 
-La validación del correo es solo de formato en el navegador. Para restringir quién accede, activar Cloudflare Access con código de un solo uso (One-time PIN).
+El permiso de admisión compara el correo ingresado con el dominio o la lista configurada; por sí solo no verifica la identidad de la persona. Para verificar identidad, activar Cloudflare Access con código de un solo uso (One-time PIN).
 
 Las respuestas correctas viajan dentro del HTML y la puntuación se calcula en el navegador; una persona con conocimientos técnicos podría verlas o alterar un resultado. El panel sirve para seguimiento de práctica, no para una evaluación formal supervisada.

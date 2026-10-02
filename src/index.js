@@ -1,5 +1,6 @@
 const EXAM_CODES = new Set(["CCAO-F", "CCDV-F", "CCAR-F", "CCAR-P"]);
 const MAX_BODY_BYTES = 100_000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: {
@@ -18,6 +19,82 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
+async function admissionSettings(env) {
+  let row;
+  try {
+    row = await env.DB.prepare("SELECT allowed_domain, allowed_emails_json FROM admission_settings WHERE id = 1").first();
+  } catch (error) {
+    // Conserva el acceso corporativo inicial si el Worker se publica antes que la migración D1.
+    if (/no such table: admission_settings/i.test(String(error?.message || error))) return { domain: "nxtara.com", emails: [] };
+    throw error;
+  }
+  return {
+    domain: String(row?.allowed_domain || "").trim().toLowerCase().replace(/^@/, ""),
+    emails: JSON.parse(row?.allowed_emails_json || "[]").map(email => String(email).trim().toLowerCase()),
+  };
+}
+
+async function isAdmitted(email, env) {
+  if (!env.DB) throw new Error("D1 no está conectada.");
+  const settings = await admissionSettings(env);
+  const normalized = email.trim().toLowerCase();
+  const domain = normalized.slice(normalized.lastIndexOf("@") + 1);
+  return settings.emails.includes(normalized) || Boolean(settings.domain && (domain === settings.domain || domain.endsWith("." + settings.domain)));
+}
+
+async function checkAdmission(request, env) {
+  if (!env.DB) return json({ error: "La admisión aún no está configurada." }, 503);
+  let body;
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 2_000) return json({ error: "Solicitud demasiado grande." }, 413);
+    body = JSON.parse(raw);
+  } catch { return json({ error: "JSON no válido." }, 400); }
+  const email = body && typeof body.email === "string" ? body.email.trim() : "";
+  if (email.length > 254 || !EMAIL_RE.test(email)) return json({ error: "Ingresa un correo válido." }, 400);
+  try {
+    if (!(await isAdmitted(email, env))) return json({ error: "Este correo no está habilitado para rendir el examen. Contacta al administrador." }, 403);
+    return json({ ok: true });
+  } catch (error) {
+    console.error("Admission check failed", error);
+    return json({ error: "No se pudo validar la admisión. Intenta de nuevo más tarde." }, 503);
+  }
+}
+
+function authorized(request, env) {
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  return Boolean(env.ADMIN_TOKEN && timingSafeEqual(token, env.ADMIN_TOKEN));
+}
+
+async function adminAdmission(request, env) {
+  if (!authorized(request, env)) return json({ error: "Acceso no autorizado." }, 401);
+  if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
+  if (request.method === "GET") {
+    try { return json({ settings: await admissionSettings(env) }); }
+    catch (error) { console.error("Admission settings read failed", error); return json({ error: "No se pudo cargar la configuración de admisión. Aplica la migración 0003." }, 503); }
+  }
+  if (request.method !== "POST") return json({ error: "Método no permitido." }, 405);
+  let body;
+  try {
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 12_000) return json({ error: "Solicitud demasiado grande." }, 413);
+    body = JSON.parse(raw);
+  } catch { return json({ error: "JSON no válido." }, 400); }
+  const domain = body && typeof body.domain === "string" ? body.domain.trim().toLowerCase().replace(/^@/, "") : "";
+  if (domain && (domain.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))) return json({ error: "Dominio no válido. Ejemplo: nxtara.com" }, 400);
+  if (!body || !Array.isArray(body.emails) || body.emails.length > 100) return json({ error: "La lista admite hasta 100 correos exactos." }, 400);
+  const emails = [...new Set(body.emails.map(value => typeof value === "string" ? value.trim().toLowerCase() : ""))];
+  if (emails.some(email => email.length > 254 || !EMAIL_RE.test(email))) return json({ error: "Hay una dirección de correo no válida." }, 400);
+  try {
+    await env.DB.prepare(`INSERT INTO admission_settings (id, allowed_domain, allowed_emails_json, updated_at)
+      VALUES (1, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+      ON CONFLICT(id) DO UPDATE SET allowed_domain=excluded.allowed_domain,
+      allowed_emails_json=excluded.allowed_emails_json, updated_at=excluded.updated_at`).bind(domain, JSON.stringify(emails)).run();
+    return json({ ok: true, settings: { domain, emails } });
+  } catch (error) { console.error("Admission settings write failed", error); return json({ error: "No se pudo guardar. Verifica que la migración 0003 esté aplicada." }, 503); }
+}
+
 async function saveAttempt(request, env) {
   if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
   let r;
@@ -32,6 +109,12 @@ async function saveAttempt(request, env) {
   if (!validId(r.attemptId) || !EXAM_CODES.has(r.examCode)) return json({ error: "Intento o examen no válido." }, 400);
   if (typeof r.participantName !== "string" || r.participantName.trim().length < 3 || r.participantName.length > 120) return json({ error: "Nombre no válido." }, 400);
   if (typeof r.email !== "string" || r.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return json({ error: "Correo no válido." }, 400);
+  try {
+    if (!(await isAdmitted(r.email, env))) return json({ error: "El correo no está autorizado para rendir." }, 403);
+  } catch (error) {
+    console.error("Attempt admission check failed", error);
+    return json({ error: "No se pudo validar la admisión." }, 503);
+  }
   if (typeof r.startedAt !== "string" || Number.isNaN(Date.parse(r.startedAt))) return json({ error: "Fecha no válida." }, 400);
   if (!["in_progress", "completed"].includes(r.status)) return json({ error: "Estado no válido." }, 400);
   if (!Number.isInteger(r.questionCount) || r.questionCount < 1 || r.questionCount > 100 || !Number.isInteger(r.answeredCount) || r.answeredCount < 0 || r.answeredCount > r.questionCount) return json({ error: "Avance no válido." }, 400);
@@ -70,9 +153,7 @@ async function saveAttempt(request, env) {
 }
 
 async function listAttempts(request, env) {
-  const auth = request.headers.get("Authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!env.ADMIN_TOKEN || !timingSafeEqual(token, env.ADMIN_TOKEN)) return json({ error: "Acceso no autorizado." }, 401);
+  if (!authorized(request, env)) return json({ error: "Acceso no autorizado." }, 401);
   if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
   try {
     const rows = await env.DB.prepare(`SELECT attempt_id, exam_code, participant_name, email, status,
@@ -89,9 +170,11 @@ async function listAttempts(request, env) {
 export default { async fetch(request, env) {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/api/")) {
+    if (path === "/api/admission/check" && request.method === "POST") return checkAdmission(request, env);
+    if (path === "/api/admin/admission") return adminAdmission(request, env);
     if (path === "/api/attempts" && request.method === "POST") return saveAttempt(request, env);
     if (path === "/api/admin/attempts" && request.method === "GET") return listAttempts(request, env);
-    if (path === "/api/attempts" || path === "/api/admin/attempts") return json({ error: "Método no permitido." }, 405);
+    if (path === "/api/attempts" || path === "/api/admin/attempts" || path === "/api/admission/check") return json({ error: "Método no permitido." }, 405);
     return json({ error: "Ruta no encontrada." }, 404);
   }
   return env.ASSETS.fetch(request);

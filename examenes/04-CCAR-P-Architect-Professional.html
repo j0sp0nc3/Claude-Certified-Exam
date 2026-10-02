@@ -385,13 +385,22 @@ function scheduleSave(){
   clearTimeout(state.saveTimer);
   state.saveTimer=setTimeout(function(){ saveAttempt("in_progress"); },700);
 }
+function currentAreas(){
+  var areas={}; EXAM.domains.forEach(function(d){areas[d]={ok:0,total:0};});
+  state.order.forEach(function(item,n){
+    if(state.answers[n]===undefined) return;
+    var q=EXAM.questions[item.idx]; if(!areas[q.d]) areas[q.d]={ok:0,total:0};
+    areas[q.d].total++; if(isCorrect(q,state.answers[n])) areas[q.d].ok++;
+  });
+  return areas;
+}
 function saveAttempt(status){
   var elapsed=Math.max(0,Math.floor((Date.now()-state.start)/1000));
   var data=status==="completed"?state.payload:{attemptId:state.attemptId,examCode:EXAM.code,
     participantName:state.name,email:state.email,status:"in_progress",startedAt:state.startedAt,
     questionCount:EXAM.itemCount,answeredCount:Object.keys(state.answers).length,elapsedSeconds:elapsed,
     currentQuestion:state.current+1,markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
-    answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number)};
+    answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),areas:currentAreas()};
   if(!data) return Promise.resolve();
   state.saveQueue=state.saveQueue.catch(function(){}).then(function(){
     return fetch("/api/attempts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data),keepalive:true})

@@ -25,11 +25,11 @@ async function admissionSettings(env) {
     row = await env.DB.prepare("SELECT allowed_domain, allowed_emails_json FROM admission_settings WHERE id = 1").first();
   } catch (error) {
     // Conserva el acceso corporativo inicial si el Worker se publica antes que la migración D1.
-    if (/no such table: admission_settings/i.test(String(error?.message || error))) return { domain: "nxtara.com", emails: [] };
+    if (/no such table: admission_settings/i.test(String(error?.message || error))) return { domains: ["nxtara.com"], emails: [] };
     throw error;
   }
   return {
-    domain: String(row?.allowed_domain || "").trim().toLowerCase().replace(/^@/, ""),
+    domains: String(row?.allowed_domain || "").split(/[\s,;]+/).map(domain => domain.trim().toLowerCase().replace(/^@/, "")).filter(Boolean),
     emails: JSON.parse(row?.allowed_emails_json || "[]").map(email => String(email).trim().toLowerCase()),
   };
 }
@@ -39,7 +39,7 @@ async function isAdmitted(email, env) {
   const settings = await admissionSettings(env);
   const normalized = email.trim().toLowerCase();
   const domain = normalized.slice(normalized.lastIndexOf("@") + 1);
-  return settings.emails.includes(normalized) || Boolean(settings.domain && (domain === settings.domain || domain.endsWith("." + settings.domain)));
+  return settings.emails.includes(normalized) || settings.domains.some(allowed => domain === allowed || domain.endsWith("." + allowed));
 }
 
 async function checkAdmission(request, env) {
@@ -81,8 +81,10 @@ async function adminAdmission(request, env) {
     if (new TextEncoder().encode(raw).byteLength > 12_000) return json({ error: "Solicitud demasiado grande." }, 413);
     body = JSON.parse(raw);
   } catch { return json({ error: "JSON no válido." }, 400); }
-  const domain = body && typeof body.domain === "string" ? body.domain.trim().toLowerCase().replace(/^@/, "") : "";
-  if (domain && (domain.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))) return json({ error: "Dominio no válido. Ejemplo: nxtara.com" }, 400);
+  const domainValues = body && Array.isArray(body.domains) ? body.domains : body && typeof body.domain === "string" ? body.domain.split(/[\s,;]+/) : [];
+  if (domainValues.length > 50 || domainValues.some(value => typeof value !== "string")) return json({ error: "La lista admite hasta 50 dominios." }, 400);
+  const domains = [...new Set(domainValues.map(value => value.trim().toLowerCase().replace(/^@/, "")).filter(Boolean))];
+  if (domains.some(domain => domain.length > 253 || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(domain))) return json({ error: "Hay un dominio no válido. Ejemplo: nxtara.com" }, 400);
   if (!body || !Array.isArray(body.emails) || body.emails.length > 100) return json({ error: "La lista admite hasta 100 correos exactos." }, 400);
   const emails = [...new Set(body.emails.map(value => typeof value === "string" ? value.trim().toLowerCase() : ""))];
   if (emails.some(email => email.length > 254 || !EMAIL_RE.test(email))) return json({ error: "Hay una dirección de correo no válida." }, 400);
@@ -90,8 +92,8 @@ async function adminAdmission(request, env) {
     await env.DB.prepare(`INSERT INTO admission_settings (id, allowed_domain, allowed_emails_json, updated_at)
       VALUES (1, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       ON CONFLICT(id) DO UPDATE SET allowed_domain=excluded.allowed_domain,
-      allowed_emails_json=excluded.allowed_emails_json, updated_at=excluded.updated_at`).bind(domain, JSON.stringify(emails)).run();
-    return json({ ok: true, settings: { domain, emails } });
+      allowed_emails_json=excluded.allowed_emails_json, updated_at=excluded.updated_at`).bind(domains.join(","), JSON.stringify(emails)).run();
+    return json({ ok: true, settings: { domains, emails } });
   } catch (error) { console.error("Admission settings write failed", error); return json({ error: "No se pudo guardar. Verifica que la migración 0003 esté aplicada." }, 503); }
 }
 

@@ -78,7 +78,7 @@ También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** �
 
 Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos, exportarlos a CSV y configurar la admisión.
 
-En el panel privado, **Admisión al examen** permite establecer el dominio corporativo y una lista opcional de correos exactos (separados por comas o saltos de línea). Un participante puede iniciar si coincide con el dominio o con una dirección exacta. La regla se valida en el Worker antes de iniciar y al guardar el avance. El valor inicial es `nxtara.com` sin excepciones exactas; modifica y guarda la regla desde el panel. Un campo de correo no verifica quién es su dueño: para comprobar identidad, protege también el sitio con Cloudflare Access y One-time PIN.
+En el panel privado, **Admisión al examen** permite establecer hasta 50 dominios (separados por comas, espacios o saltos de línea) y una lista opcional de correos exactos. Un participante puede iniciar si coincide con cualquiera de los dominios o con una dirección exacta. La regla se valida en el Worker antes de iniciar y al guardar el avance. El valor inicial es `nxtara.com` sin excepciones exactas; modifica y guarda la regla desde el panel. Un campo de correo no verifica quién es su dueño: para comprobar identidad, protege también el sitio con Cloudflare Access y One-time PIN.
 
 Despliegue manual (opcional):
 

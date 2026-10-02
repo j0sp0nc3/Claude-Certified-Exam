@@ -402,7 +402,7 @@ function currentAreas(){
   });
   return areas;
 }
-function saveAttempt(status){
+function saveAttempt(status,exitedAt){
   var elapsed=Math.max(0,Math.floor((Date.now()-state.start)/1000));
   var data=status==="completed"?state.payload:{attemptId:state.attemptId,examCode:EXAM.code,
     participantName:state.name,email:state.email,status:"in_progress",startedAt:state.startedAt,
@@ -410,6 +410,7 @@ function saveAttempt(status){
     currentQuestion:state.current+1,markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
     answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),areas:currentAreas()};
   if(!data) return Promise.resolve();
+  if(status!=="completed"&&exitedAt) data.exitedAt=exitedAt;
   state.saveQueue=state.saveQueue.catch(function(){}).then(function(){
     return fetch("/api/attempts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data),keepalive:true})
       .then(function(r){return r.json().then(function(d){if(!r.ok) throw new Error(d.error||"HTTP "+r.status);return d;});});
@@ -429,7 +430,7 @@ function send(){
   $("btnRetrySend").classList.add("hidden");
   saveAttempt("completed");
 }
-window.addEventListener("pagehide",function(){if(state.attemptId&&!state.submitted) saveAttempt("in_progress");});
+window.addEventListener("pagehide",function(){if(state.attemptId&&!state.submitted) saveAttempt("in_progress",new Date().toISOString());});
 })();
 </script>
 </body>

@@ -80,6 +80,8 @@ Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages �
 
 En el panel privado, **Admisión al examen** mantiene reglas individuales en una tabla: hasta 50 dominios y 100 correos exactos. Un participante puede iniciar si coincide con cualquiera de las reglas; el Worker genera una expresión regular segura para cada entrada y la evalúa antes de iniciar y al guardar el avance. El valor inicial es `nxtara.com`; modifica, agrega o quita reglas desde el panel y pulsa **Guardar reglas**. Un campo de correo no verifica quién es su dueño: para comprobar identidad, protege también el sitio con Cloudflare Access y One-time PIN.
 
+Cada intento registra la hora de entrada al comenzar y la hora de salida al enviar el examen o abandonar la página. El panel y el CSV muestran ambas marcas; los intentos sin salida confirmada aparecen como tales.
+
 Despliegue manual (opcional):
 
 ```bash

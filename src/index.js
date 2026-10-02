@@ -135,7 +135,7 @@ async function saveAttempt(request, env) {
         attempt_id, exam_code, participant_name, email, status, started_at, updated_at,
         finished_at, exit_at, question_count, answered_count, elapsed_seconds, current_question, marked_count, correct_count,
         score_percent, result_label, answers_json, marked_json, areas_json
-      ) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(attempt_id) DO UPDATE SET
         participant_name=excluded.participant_name, email=excluded.email, status=excluded.status,
         updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), finished_at=excluded.finished_at,

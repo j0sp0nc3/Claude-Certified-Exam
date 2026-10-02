@@ -39,7 +39,9 @@ async function isAdmitted(email, env) {
   const settings = await admissionSettings(env);
   const normalized = email.trim().toLowerCase();
   const domain = normalized.slice(normalized.lastIndexOf("@") + 1);
-  return settings.emails.includes(normalized) || settings.domains.some(allowed => domain === allowed || domain.endsWith("." + allowed));
+  const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return settings.emails.some(allowed => new RegExp("^" + escapeRegex(allowed) + "$", "i").test(normalized)) ||
+    settings.domains.some(allowed => new RegExp("^[^\\s@]+@(?:[a-z0-9-]+\\.)*" + escapeRegex(allowed) + "$", "i").test(normalized));
 }
 
 async function checkAdmission(request, env) {

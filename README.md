@@ -1,6 +1,6 @@
 # Claude Certified Exam – Simulacros de práctica
 
-Simulacros de examen para preparar al equipo en las cuatro certificaciones de Claude:
+Simulacros de examen en español e inglés para preparar al equipo en las cuatro certificaciones de Claude. El selector de idioma aparece en cada página y recuerda la preferencia en ese navegador:
 
 | Archivo | Certificación | Banco | Por intento |
 |---|---|---|---|
@@ -20,7 +20,8 @@ Simulacros de examen para preparar al equipo en las cuatro certificaciones de Cl
   - **Selección múltiple**: 5 opciones, se indica cuántas elegir (2 o 3). Puntúa solo si se aciertan todas.
 - Orden de preguntas y opciones aleatorio; navegación de una pregunta a la vez, botones anterior/siguiente y marca de preguntas para revisar.
 - Tiempo límite de 120 minutos con envío automático al agotarse el tiempo. El 72 % es un umbral interno de práctica y no convierte el puntaje a la escala oficial 720/1000.
-- Al finalizar se muestra el puntaje, el resultado por área del banco y la revisión con explicaciones. El examen oficial es en inglés y a libro cerrado; este simulacro está en español y no está supervisado.
+- Al finalizar se muestra el puntaje, el resultado por área del banco y la revisión con explicaciones. Preguntas, alternativas y explicaciones están disponibles en ambos idiomas. El examen oficial es en inglés y a libro cerrado; este simulacro no está supervisado.
+- Las traducciones al inglés se generaron automáticamente; revísalas antes de usarlas como material formal de evaluación.
 - El avance se guarda mientras la persona responde y el resultado al terminar se conserva en Cloudflare D1.
 - El panel privado `/admin.html` se actualiza cada cinco segundos y permite observar quién está conectado, la pregunta actual, el avance, las marcas y los tiempos. Muestra aciertos y porcentaje por área, destaca el área más débil y exporta ese desglose a CSV. Permite filtrar por dominio o correo exacto; no muestra las respuestas elegidas durante el examen.
 
@@ -31,6 +32,9 @@ build/
   template.html          # Motor del examen (HTML/CSS/JS)
   exam_*.py              # Preguntas 1-50 de cada examen (dominios, metadatos)
   exam_*_2.py            # Preguntas 51-100 de cada examen
+  translations_en.json   # Traducciones inglesas del banco (identificadas por pregunta original)
+  translate_banks_en.py  # Regenera traducciones si cambia el banco (con conexión a Internet)
+  i18n.js                # Selector de idioma y traducciones de interfaz
   build.py               # Genera examenes/*.html
 examenes/                # HTML generados (lo que se publica)
 wrangler.jsonc           # Despliegue como Cloudflare Worker (assets estáticos)
@@ -59,6 +63,8 @@ python build/build.py
 ```
 
 El script valida que haya 100 preguntas por examen, sin duplicados, y suficientes por dominio.
+
+Si se edita una pregunta, añade la traducción correspondiente a `build/translations_en.json` o vuelve a generarlas con `python build/translate_banks_en.py` antes de reconstruir los HTML.
 
 ## Despliegue en Cloudflare Workers
 

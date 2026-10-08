@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__TITLE__</title>
+<title data-en="__TITLE_EN__">__TITLE__</title>
 <style>
 :root{
   --bg:#f6f5f1;--surface:#ffffff;--surface-2:#f0eee8;--text:#1f1e1c;--muted:#6b6862;
@@ -93,8 +93,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <!-- Pantalla de inicio -->
 <div class="wrap" id="start">
   <span class="pill">__CODE__ · Simulacro de práctica</span>
-  <h1>__TITLE__</h1>
-  <p class="muted">__DESC__</p>
+  <h1 id="examTitle" data-en="__TITLE_EN__">__TITLE__</h1>
+  <p class="muted" id="examDesc" data-en="__DESC_EN__">__DESC__</p>
   <div class="card">
     <h2>Antes de comenzar</h2>
     <ul class="info">
@@ -145,7 +145,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <!-- Resultados -->
 <div class="wrap hidden" id="results">
   <span class="pill">__CODE__ · Resultado</span>
-  <h1>__TITLE__</h1>
+  <h1 id="resultTitle" data-en="__TITLE_EN__">__TITLE__</h1>
   <div class="card">
     <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
       <div><div class="score" id="rScore">0%</div><div class="muted" id="rRaw"></div></div>
@@ -175,10 +175,13 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 (function(){
 "use strict";
 var EXAM = JSON.parse(decodeURIComponent(escape(atob("__DATA__"))));
+var LANG = localStorage.getItem("claude-exam-language") === "en" ? "en" : "es";
 var MINUTES = __MINUTES__;
 var PASS = 0.72;
 
 var $ = function(id){ return document.getElementById(id); };
+function localText(q,key){ return LANG==="en" ? (q[key+"_en"] || q[key]) : q[key]; }
+function domainText(d){ var i=EXAM.domains.indexOf(d); return LANG==="en"&&i>=0?(EXAM.domains_en[i]||d):d; }
 var state = { name:"", email:"", attemptId:"", startedAt:"", order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, heartbeatId:null, saveTimer:null, saveQueue:Promise.resolve(), submitted:false, payload:null };
 
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
@@ -231,14 +234,14 @@ function begin(){
   var box=$("questions"), grid=$("navGrid"), html="", g="";
   state.order.forEach(function(item,n){
     var q=EXAM.questions[item.idx], multi=isMulti(q);
-    html += '<div class="card q" id="q'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+' de '+EXAM.itemCount+'</strong><span class="pill">'+esc(q.d)+'</span></div>'+
-      '<p class="qtext">'+fmt(q.q)+'</p>'+
-      (multi ? '<p class="multi-hint">Selección múltiple: selecciona '+q.a.length+' opciones.</p>' : '');
+    html += '<div class="card q" id="q'+n+'"><div class="qhead"><strong>'+(LANG==="en"?"Question ":"Pregunta ")+(n+1)+(LANG==="en"?" of ":" de ")+EXAM.itemCount+'</strong><span class="pill">'+esc(localText(q,"d"))+'</span></div>'+
+      '<p class="qtext">'+fmt(localText(q,"q"))+'</p>'+
+      (multi ? '<p class="multi-hint">'+(LANG==="en"?"Multiple choice: select ":"Selección múltiple: selecciona ")+q.a.length+(LANG==="en"?" options.":" opciones.")+'</p>' : '');
     item.opts.forEach(function(k,j){
-      html += '<label class="opt" data-n="'+n+'"><input type="'+(multi?"checkbox":"radio")+'" name="r'+n+'" value="'+k+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(q.o[k])+'</span></label>';
+      html += '<label class="opt" data-n="'+n+'"><input type="'+(multi?"checkbox":"radio")+'" name="r'+n+'" value="'+k+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(LANG==="en"?(q.o_en||q.o)[k]:q.o[k])+'</span></label>';
     });
     html += '</div>';
-    g += '<a href="#q'+n+'" id="nav'+n+'" data-index="'+n+'" aria-label="Ir a pregunta '+(n+1)+'">'+(n+1)+'</a>';
+    g += '<a href="#q'+n+'" id="nav'+n+'" data-index="'+n+'" aria-label="'+(LANG==="en"?"Go to question ":"Ir a pregunta ")+(n+1)+'">'+(n+1)+'</a>';
   });
   box.innerHTML=html; grid.innerHTML=g;
   box.addEventListener("change", function(ev){
@@ -317,7 +320,7 @@ function tick(){
 
 $("btnSubmit").addEventListener("click", function(){
   var missing=EXAM.itemCount-Object.keys(state.answers).length;
-  var msg = missing>0 ? "Tienes "+missing+" pregunta(s) sin responder. ¿Enviar de todos modos?" : "¿Confirmas el envío del examen?";
+  var msg = missing>0 ? (LANG==="en"?"You have "+missing+" unanswered question(s). Submit anyway?":"Tienes "+missing+" pregunta(s) sin responder. ¿Enviar de todos modos?") : (LANG==="en"?"Confirm exam submission?":"¿Confirmas el envío del examen?");
   if(confirm(msg)) finish(false);
 });
 
@@ -337,14 +340,14 @@ function finish(timeout){
 
   $("exam").classList.add("hidden"); $("results").classList.remove("hidden"); window.scrollTo(0,0);
   $("rScore").textContent=Math.round(pct*100)+"%";
-  $("rRaw").textContent=correct+" de "+EXAM.itemCount+" correctas · umbral interno de práctica: 72 %";
+  $("rRaw").textContent=LANG==="en"?correct+" of "+EXAM.itemCount+" correct · internal practice threshold: 72 %":correct+" de "+EXAM.itemCount+" correctas · umbral interno de práctica: 72 %";
   var b=$("rBadge"); b.textContent=passed?"UMBRAL DE PRÁCTICA ALCANZADO":"BAJO EL UMBRAL DE PRÁCTICA"; b.className="badge "+(passed?"pass":"fail");
   $("rMeta").textContent=state.name+" · "+state.email+" · Tiempo: "+mmss(elapsed)+(timeout?" (tiempo agotado)":"");
 
   var rows="", domTxt=[];
   Object.keys(doms).forEach(function(d){
     var x=doms[d], p=x.total?Math.round(x.ok/x.total*100):0;
-    rows+='<tr><td>'+esc(d)+'<div class="bar"><i style="width:'+p+'%"></i></div></td><td class="num">'+x.ok+'/'+x.total+'</td><td class="num">'+p+'%</td></tr>';
+    rows+='<tr><td>'+esc(domainText(d))+'<div class="bar"><i style="width:'+p+'%"></i></div></td><td class="num">'+x.ok+'/'+x.total+'</td><td class="num">'+p+'%</td></tr>';
     domTxt.push(d+": "+x.ok+"/"+x.total+" ("+p+"%)");
   });
   $("rDomains").innerHTML=rows;
@@ -355,7 +358,7 @@ function finish(timeout){
     answeredCount:Object.keys(state.answers).length, elapsedSeconds:Math.floor(elapsed/1000),
     currentQuestion:state.current+1, markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
     correctCount:correct, scorePercent:Math.round(pct*100),
-    resultLabel:passed?"Umbral de práctica alcanzado":"Bajo el umbral de práctica",
+    resultLabel:passed?(LANG==="en"?"Practice threshold reached":"Umbral de práctica alcanzado"):(LANG==="en"?"Below practice threshold":"Bajo el umbral de práctica"),
     answers:state.answers, marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),
     areas:doms };
   send();
@@ -365,15 +368,15 @@ function renderReview(){
   var html="", g="";
   state.order.forEach(function(item,n){
     var q=EXAM.questions[item.idx], a=state.answers[n], ok=isCorrect(q,a);
-    html+='<div class="card q rv '+(ok?"ok":"ko")+'" id="rv'+n+'"><div class="qhead"><strong>Pregunta '+(n+1)+(ok?" ✓":" ✗")+'</strong><span class="pill">'+esc(q.d)+'</span></div><p class="qtext">'+fmt(q.q)+'</p>'+
-      (isMulti(q) ? '<p class="multi-hint">Selección múltiple: '+q.a.length+' respuestas correctas.</p>' : '');
+    html+='<div class="card q rv '+(ok?"ok":"ko")+'" id="rv'+n+'"><div class="qhead"><strong>'+(LANG==="en"?"Question ":"Pregunta ")+(n+1)+(ok?" ✓":" ✗")+'</strong><span class="pill">'+esc(localText(q,"d"))+'</span></div><p class="qtext">'+fmt(localText(q,"q"))+'</p>'+
+      (isMulti(q) ? '<p class="multi-hint">'+(LANG==="en"?"Multiple choice: ":"Selección múltiple: ")+q.a.length+(LANG==="en"?" correct answers.":" respuestas correctas.")+'</p>' : '');
     item.opts.forEach(function(k,j){
       var good=has(q.a,k), mine=a!==undefined && has(a,k);
       var cls = good ? " correct" : (mine ? " wrong" : "");
-      html+='<div class="opt'+cls+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(q.o[k])+(mine?' <em class="muted">(tu respuesta)</em>':'')+'</span></div>';
+      html+='<div class="opt'+cls+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(LANG==="en"?(q.o_en||q.o)[k]:q.o[k])+(mine?' <em class="muted">('+(LANG==="en"?"your answer":"tu respuesta")+')</em>':'')+'</span></div>';
     });
-    if(a===undefined) html+='<p class="muted" style="margin:4px 0 0">Sin responder.</p>';
-    html+='<div class="explain"><strong>Explicación:</strong> '+fmt(q.e)+'</div></div>';
+    if(a===undefined) html+='<p class="muted" style="margin:4px 0 0">'+(LANG==="en"?"Unanswered.":"Sin responder.")+'</p>';
+    html+='<div class="explain"><strong>'+(LANG==="en"?"Explanation:":"Explicación:")+'</strong> '+fmt(localText(q,"e"))+'</div></div>';
     g+='<a href="#rv'+n+'" class="'+(ok?"ok":"ko")+'">'+(n+1)+'</a>';
   });
   $("review").innerHTML=html; $("rGrid").innerHTML=g;
@@ -433,5 +436,6 @@ function send(){
 window.addEventListener("pagehide",function(){if(state.attemptId&&!state.submitted) saveAttempt("in_progress",new Date().toISOString());});
 })();
 </script>
+<script src="i18n.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 # Progreso: simulación de condiciones oficiales
 
 **Actualizado:** 2026-10-25  
-**Porcentaje total ponderado:** **70.3%**
+**Porcentaje total ponderado:** **70.8%**
 **Último commit confirmado al iniciar este bloque:** `5b4520f` — Move simulation keys to private D1 bank  
 **Tarea activa:** Migración, despliegue y validación  
 **Siguiente paso verificable:** aplicar las migraciones `0005` y `0006` en D1 remoto, cargar el primer banco privado aprobado y comprobar `/api/simulation/profiles` y la administración en el sitio desplegado.
@@ -17,7 +17,7 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | Banco seguro y claves privadas | 18% | 70% | En curso | El repositorio contiene solo metadata de blueprint; banco y claves pasarán a D1 privado. Pruebas verifican que ni HTML ni metadata versionada llevan claves | `build/build.py`, `src/generated/simulation-profiles.js`, `src/simulation.mjs`, `migrations/0006_private_simulation_bank.sql`, `tests/simulation.test.mjs` | Aplicar 0006 y cargar banco privado revisado |
 | Migración D1 y API de intentos | 12% | 80% | En curso | Endpoints de inicio, avance, envío, vencimiento y corrección consultan banco D1 privado; bundle validado en seco | `migrations/0005_simulation_attempts.sql`, `migrations/0006_private_simulation_bank.sql`, `src/index.js`, `src/simulation.mjs` | Aplicar migraciones remotas y recorrer un intento habilitado |
 | Interfaz de simulación | 14% | 90% | En curso | Página inglesa de simulación, reloj según vencimiento, navegación, marcas, reanudación y resultado agregado; prueba verifica que el HTML no contiene campo de claves | `build/simulation.html`, `examenes/simulation.html`, `src/index.js`, `tests/simulation.test.mjs` | Recorrerla contra un perfil editorial habilitado |
-| Integridad y panel administrativo | 10% | 90% | En curso | Eventos mínimos en D1; panel filtra por modo, muestra vencimiento, versión, índice, debilidad y detalle bajo demanda sin respuestas ni claves | `src/index.js`, `src/simulation.mjs`, `migrations/0005_simulation_attempts.sql`, `build/admin.html`, `examenes/admin.html` | Validar panel con D1 remoto migrado y un intento habilitado |
+| Integridad y panel administrativo | 10% | 95% | En curso | Eventos mínimos en D1; panel filtra por modo, muestra vencimiento, versión, índice, debilidad y detalle bajo demanda sin respuestas ni claves. Además muestra la cobertura privada requerida por dominio | `src/index.js`, `src/simulation.mjs`, `migrations/0005_simulation_attempts.sql`, `build/admin.html`, `examenes/admin.html` | Validar panel con D1 remoto migrado y un intento habilitado |
 | Contenido y revisión editorial | 16% | 0% | Bloqueada por cobertura editorial | La especificación documenta que el banco actual no alcanza tres formularios por dominio | `docs/especificacion-simulacion-condiciones-oficiales.md` | Clasificar y revisar contenido inglés; completar tres formularios por perfil |
 | Pruebas automatizadas | 7% | 75% | En curso | Cuotas Python; selección, ausencia de claves en HTML y metadata; corrección de múltiple respuesta, restauración y vencimiento; `wrangler deploy --dry-run` válido | `tests/test_official_profiles.py`, `tests/simulation.test.mjs` | Añadir prueba de API D1 y recorrido navegador con un perfil habilitado |
 | Migración, despliegue y validación | 3% | 40% | En curso | Workers Builds publicó interfaz, panel y endpoint de perfiles; ejecución remota de Wrangler bloqueada por token local inválido | `535751c`, comprobación HTTPS de `/simulation.html` y `/api/simulation/profiles` | Aplicar 0005/0006 con credencial Cloudflare y validar D1 |
@@ -38,6 +38,7 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | 2026-10-25 | `535751c` | Interfaz inglesa, panel de simulación, detalles privados de integridad y pruebas del HTML público. |
 | 2026-10-25 | `5b4520f` | Banco privado D1, eliminación de claves versionadas, validación de metadata y migración 0006. |
 | 2026-10-25 | Verificado en producción | Workers Builds publica `simulation.html`; `/api/simulation/profiles` responde cuatro perfiles y señala correctamente que el banco privado aún requiere migración. |
+| 2026-10-25 | Pendiente al confirmar este bloque | El panel administrativo incorpora la matriz de cobertura privada por certificación y dominio. |
 
 ## Protocolo de continuación
 

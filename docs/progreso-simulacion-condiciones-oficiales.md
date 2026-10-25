@@ -42,6 +42,7 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | 2026-10-25 | Verificado en producción | Workers Builds publica `simulation.html`; `/api/simulation/profiles` responde cuatro perfiles y señala correctamente que el banco privado aún requiere migración. |
 | 2026-10-25 | `42bd17d` | El panel administrativo incorpora la matriz de cobertura privada por certificación y dominio. |
 | 2026-10-25 | Verificado en producción | `/admin.html` muestra la matriz de cobertura; `/api/simulation/profiles` responde 200 y mantiene los perfiles bloqueados hasta aplicar la migración privada. |
+| 2026-10-25 | `c79d52d` | Práctica opcional con feedback, reanudación y recursos; nueva tabla 0007 compatible con Study; simulación exige aceptación de condiciones cerradas. Workers Builds completado y nueva interfaz/API confirmadas en producción. No se modificó el 70.8% de simulación: siguen pendientes migraciones y banco privado. |
 
 ## Protocolo de continuación
 

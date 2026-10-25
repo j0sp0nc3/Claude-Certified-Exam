@@ -2,7 +2,7 @@
 
 **Actualizado:** 2026-10-25  
 **Porcentaje total ponderado:** **70.3%**
-**Último commit confirmado al iniciar este bloque:** `48777aa` — Add secure server-side simulation attempts  
+**Último commit confirmado al iniciar este bloque:** `5b4520f` — Move simulation keys to private D1 bank  
 **Tarea activa:** Migración, despliegue y validación  
 **Siguiente paso verificable:** aplicar las migraciones `0005` y `0006` en D1 remoto, cargar el primer banco privado aprobado y comprobar `/api/simulation/profiles` y la administración en el sitio desplegado.
 
@@ -36,7 +36,8 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | 2026-10-25 | `fe65692` | Blueprints, cálculo de cuotas, separación inicial de banco privado y prueba de cuotas. |
 | 2026-10-25 | `48777aa` | Worker, migración D1, selección segura, corrección servidor y pruebas de unidad. |
 | 2026-10-25 | `535751c` | Interfaz inglesa, panel de simulación, detalles privados de integridad y pruebas del HTML público. |
-| 2026-10-25 | Pendiente al confirmar este bloque | Banco privado D1, eliminación de claves versionadas, validación de metadata y migración 0006. |
+| 2026-10-25 | `5b4520f` | Banco privado D1, eliminación de claves versionadas, validación de metadata y migración 0006. |
+| 2026-10-25 | Verificado en producción | Workers Builds publica `simulation.html`; `/api/simulation/profiles` responde cuatro perfiles y señala correctamente que el banco privado aún requiere migración. |
 
 ## Protocolo de continuación
 

@@ -1,4 +1,5 @@
-import base64, json, html, pathlib, importlib, shutil
+import base64, json, html, pathlib, importlib, shutil, hashlib
+from practice_resources import RESOURCE_VERSION, RESOURCES, STUDY_DOMAIN_RESOURCES
 
 from official_profiles import (
     BLUEPRINT_VERSION,
@@ -61,13 +62,18 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
         n = sum(1 for x in qs if x[0] == d)
         assert n >= quota[d], (mod, d, n)
     multi = sum(1 for x in qs if isinstance(x[2], list))
+    resource_ids = STUDY_DOMAIN_RESOURCES[ex["code"]]
+    assert set(resource_ids) == set(ex["domains"]), (mod, "resource coverage")
     data = {
         "code": ex["code"], "title": ex["title"], "title_en": bank_translation.get("title", ex["title"]),
         "desc_en": bank_translation.get("desc", ex["desc"]),
         "domains": ex["domains"], "domains_en": bank_translation.get("domains", ex["domains"]), "quota": quota,
         "itemCount": item_count,
         "questions": [to_q(i, *x) for i, x in enumerate(qs)],
+        "resourceVersion": RESOURCE_VERSION,
+        "resources": {d: [RESOURCES[key] for key in resource_ids[d]] for d in ex["domains"]},
     }
+    data["contentVersion"] = hashlib.sha256(json.dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
     b64 = base64.b64encode(json.dumps(data, ensure_ascii=False).encode("utf-8")).decode()
     page = (tpl.replace("__DATA__", b64)
                .replace("__TITLE__", html.escape(ex["title"]))
@@ -109,7 +115,7 @@ print("OK src/generated/simulation-profiles.js")
 
 items = "".join(
     f'<a class="card" href="{c["file"]}"><span class="pill">{c["code"]}</span><h2 data-en="{html.escape(translations_en.get(c["code"], {}).get("title", c["title"]))}">{html.escape(c["title"])}</h2>'
-    f'<p data-en="{html.escape(translations_en.get(c["code"], {}).get("desc", c["desc"]))}">{html.escape(c["desc"])}</p><span class="go" data-en="Study mode →">Modo Estudio →</span></a>' for c in cards)
+    f'<p data-en="{html.escape(translations_en.get(c["code"], {}).get("desc", c["desc"]))}">{html.escape(c["desc"])}</p><span class="go" data-en="Practice with or without feedback →">Práctica con o sin feedback →</span></a>' for c in cards)
 index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title data-en="Claude Certification Practice Exams">Simulacros Certificación Claude</title><style>
 :root{{--bg:#f6f5f1;--surface:#fff;--text:#1f1e1c;--muted:#6b6862;--border:#dedad2;--accent:#c96442;--pill:#f0eee8}}

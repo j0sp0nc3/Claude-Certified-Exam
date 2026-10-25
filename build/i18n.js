@@ -1,6 +1,14 @@
 (() => {
   "use strict";
   const translations = {
+    "Práctica guiada": "Guided practice",
+    "Práctica sin feedback": "Practice without feedback",
+    "Estudio anterior": "Previous Study mode",
+    "Modalidad de práctica": "Practice feedback",
+    "Todas las modalidades": "All practice settings",
+    "Con feedback": "With feedback",
+    "Sin feedback": "Without feedback",
+    "Verificada": "Verified",
     "Simulacros de Certificación Claude": "Claude Certification Practice Exams",
     "Simulacros de práctica en español e inglés con duración de": "Practice exams in Spanish and English with a time limit of",
     "minutos. Cada examen usa la cantidad de preguntas de su formato de referencia y sortea desde un banco de 100. El umbral interno de práctica es 72 %; no equivale a la puntuación escalada oficial. El avance y los resultados se guardan en el panel privado.": "minutes. Each exam follows its reference format and selects questions from a bank of 100. The practice threshold is 72%; it is not equivalent to the official scaled score. Progress and results are saved to the private dashboard.",

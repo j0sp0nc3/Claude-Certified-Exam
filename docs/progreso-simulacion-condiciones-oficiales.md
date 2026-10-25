@@ -24,6 +24,8 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 
 ## Bloqueadores
 
+**Ampliación de Práctica:** seguimiento independiente en [progreso-practica-feedback.md](progreso-practica-feedback.md). Añade feedback inmediato opcional, reanudación y recursos; no aumenta la cobertura del banco privado ni el porcentaje de este tablero. La simulación incorpora aceptación previa de condiciones de libro cerrado.
+
 1. **Cobertura editorial:** ningún perfil debe marcarse disponible hasta tener tres veces la cuota de cada dominio, preguntas originales y revisión en inglés. El banco actual tiene 100 preguntas por examen, pero todavía no está clasificado por toda la taxonomía oficial de CCAO-F, CCDV-F y CCAR-P.
 2. **Despliegue D1:** `0005` y `0006` aún requieren aplicarse en la base remota. Wrangler no pudo autenticarse porque falta `CLOUDFLARE_API_TOKEN` válido en esta sesión.
 3. **Banco privado:** no se debe cargar contenido ni claves de simulación en Git, assets estáticos o el banco de Estudio. La primera carga debe permanecer en un archivo privado y ser revisada antes de marcar filas como `approved`.

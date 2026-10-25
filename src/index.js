@@ -1,4 +1,5 @@
 import { SIMULATION_PROFILES } from "./generated/simulation-profiles.js";
+import { PRACTICE_FEEDBACK_SCHEMA, practiceSettings } from "./practice.mjs";
 import {
   SIMULATION_EVENT_TYPES,
   answeredCount,
@@ -120,6 +121,9 @@ async function saveAttempt(request, env) {
     r = JSON.parse(raw);
   } catch { return json({ error: "JSON no válido." }, 400); }
 
+  if (!r || typeof r !== "object" || Array.isArray(r)) return json({ error: "Registro no válido." }, 400);
+  const feedback = practiceSettings(r);
+  if (!feedback) return json({ error: "Modalidad o respuestas verificadas no válidas." }, 400);
   const currentQuestion = Number.isInteger(r.currentQuestion) ? r.currentQuestion : 1;
   const markedCount = Number.isInteger(r.markedCount) ? r.markedCount : (Array.isArray(r.marked) ? r.marked.length : 0);
   if (!validId(r.attemptId) || !EXAM_CODES.has(r.examCode)) return json({ error: "Intento o examen no válido." }, 400);
@@ -142,7 +146,12 @@ async function saveAttempt(request, env) {
   try {
     const finishedAt = r.status === "completed" ? new Date().toISOString() : null;
     const exitAt = finishedAt || r.exitedAt || null;
-    await env.DB.prepare(`
+    if (feedback.mode !== "legacy") {
+      await env.DB.prepare(PRACTICE_FEEDBACK_SCHEMA).run();
+      const previous = await env.DB.prepare("SELECT feedback_mode FROM practice_feedback WHERE attempt_id = ?").bind(r.attemptId).first();
+      if (previous && previous.feedback_mode !== feedback.mode) return json({ error: "La modalidad de feedback no puede cambiar durante el intento." }, 409);
+    }
+    const statement = env.DB.prepare(`
       INSERT INTO attempts (
         attempt_id, exam_code, participant_name, email, status, started_at, updated_at,
         finished_at, exit_at, question_count, answered_count, elapsed_seconds, current_question, marked_count, correct_count,
@@ -164,7 +173,11 @@ async function saveAttempt(request, env) {
       r.status === "completed" ? r.correctCount : null,
       r.status === "completed" ? r.scorePercent : null,
       r.status === "completed" ? String(r.resultLabel || "") : null,
-      JSON.stringify(r.answers || {}), JSON.stringify(r.marked || []), JSON.stringify(r.areas || {})).run();
+      JSON.stringify(r.answers || {}), JSON.stringify(r.marked || []), JSON.stringify(r.areas || {}));
+    if (feedback.mode === "legacy") await statement.run();
+    else await env.DB.batch([statement, env.DB.prepare(`INSERT INTO practice_feedback (attempt_id, feedback_mode, verified_json)
+      VALUES (?, ?, ?) ON CONFLICT(attempt_id) DO UPDATE SET verified_json=excluded.verified_json`)
+      .bind(r.attemptId, feedback.mode, JSON.stringify(feedback.verified))]);
     return json({ ok: true });
   } catch (error) {
     console.error("D1 write failed", error);
@@ -176,16 +189,29 @@ async function listAttempts(request, env) {
   if (!authorized(request, env)) return json({ error: "Acceso no autorizado." }, 401);
   if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
   try {
-    const rows = await env.DB.prepare(`SELECT attempt_id, exam_code, participant_name, email, status,
+    const baseColumns = `attempt_id, exam_code, participant_name, email, status,
       started_at, updated_at, finished_at, exit_at, question_count, answered_count, elapsed_seconds,
-      current_question, marked_count,
-      correct_count, score_percent, result_label, areas_json, mode, blueprint_version, deadline_at,
+      current_question, marked_count, correct_count, score_percent, result_label, areas_json`;
+    let rows;
+    try { rows = await env.DB.prepare(`SELECT ${baseColumns}, mode, blueprint_version, deadline_at,
       completion_reason, integrity_event_count, last_event_at
-      FROM attempts ORDER BY started_at DESC LIMIT 2000`).all();
+      FROM attempts ORDER BY started_at DESC LIMIT 2000`).all(); }
+    catch (error) {
+      if (!/no such column/i.test(String(error?.message || error))) throw error;
+      // Study results must remain readable while the separate simulation migration is pending.
+      rows = await env.DB.prepare(`SELECT ${baseColumns}, 'study' AS mode FROM attempts ORDER BY started_at DESC LIMIT 2000`).all();
+    }
+    let settings = new Map();
+    try {
+      const feedback = await env.DB.prepare(`SELECT attempt_id, feedback_mode FROM practice_feedback
+        WHERE attempt_id IN (SELECT attempt_id FROM attempts ORDER BY started_at DESC LIMIT 2000)`).all();
+      settings = new Map((feedback.results || []).map(row => [row.attempt_id, row.feedback_mode]));
+    } catch (error) { if (!/no such table: practice_feedback/i.test(String(error?.message || error))) throw error; }
     const attempts = (rows.results || []).map(row => {
       const profile = row.mode === "simulation" ? simulationProfile(row.exam_code) : null;
       return {
         ...row,
+        feedback_mode: row.mode === "simulation" ? "none" : settings.get(row.attempt_id) || "legacy",
         areaNames: profile ? Object.fromEntries(profile.domains.map(domain => [domain.id, domain.name])) : undefined,
       };
     });
@@ -417,6 +443,7 @@ async function startSimulation(request, env) {
   if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
   const parsed = await readSimulationRequest(request, 10_000);
   if (parsed.error) return parsed.error;
+  if (parsed.body.conditionsAccepted !== true) return json({ error: "Accept the closed-book conditions before starting." }, 400);
   const participant = validParticipant(parsed.body);
   const baseProfile = simulationProfile(parsed.body.examCode);
   if (!participant || !baseProfile) return json({ error: "Participante o certificación no válida." }, 400);

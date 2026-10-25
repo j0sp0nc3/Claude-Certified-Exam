@@ -82,6 +82,10 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .status.warn{background:var(--warn-bg);color:var(--warn)}
 .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .hidden{display:none!important}
+.feedback-choice{border:1px solid var(--border);border-radius:8px;padding:12px;margin:16px 0}
+.feedback-choice label{display:block;margin:8px 0;cursor:pointer}
+.feedback-result{margin-top:16px;border-left:4px solid var(--accent);padding:12px;background:var(--surface-2)}
+.feedback-result a{color:var(--accent)}
 .filter{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .filter button{padding:6px 12px;font-size:.88rem}
 .filter button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -102,7 +106,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
       <li>Tiempo límite: <strong>__MINUTES__ minutos</strong>. Al terminar el tiempo el examen se envía automáticamente.</li>
       <li>Umbral interno de práctica: <strong>72 %</strong>. No es una conversión del puntaje escalado oficial.</li>
       <li>Cada intento sortea preguntas de un banco de __POOL__; el orden de preguntas y respuestas también cambia.</li>
-      <li>El examen oficial se rinde en inglés y es a libro cerrado. Este simulacro está en español y no está supervisado.</li>
+      <li data-en="The official exam is in English and closed book. This bilingual practice is not proctored.">El examen oficial se rinde en inglés y a libro cerrado. Esta práctica bilingüe no está supervisada.</li>
       <li>El panel privado permite observar en línea tu avance, pregunta actual, marcas y tiempo. Las respuestas no se muestran durante el examen.</li>
     </ul>
     <p class="muted" style="font-size:.88rem;margin-top:12px">Áreas de este banco de práctica: __DOMAINS__</p>
@@ -110,7 +114,12 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     <input type="text" id="cName" autocomplete="name" placeholder="Ej. María González">
     <label class="field" for="cEmail">Correo corporativo</label>
     <input type="email" id="cEmail" autocomplete="email" placeholder="nombre@empresa.com">
-    <div class="actions"><button class="primary" id="btnStart">Comenzar examen</button></div>
+    <fieldset class="feedback-choice"><legend data-en="Practice feedback">Feedback de la práctica</legend>
+      <label><input type="radio" name="feedbackMode" value="immediate" checked> <strong data-en="With feedback">Con feedback</strong> — <span data-en="Verify each answer to see the explanation and an official learning resource. Verified answers are locked.">Verifica cada respuesta para ver la explicación y un recurso oficial. Las respuestas verificadas quedan bloqueadas.</span></label>
+      <label><input type="radio" name="feedbackMode" value="none"> <strong data-en="Without feedback">Sin feedback</strong> — <span data-en="See only overall and domain results when you finish, without individual answers or explanations.">Al finalizar verás solo el resultado global y por dominio, sin respuestas ni explicaciones individuales.</span></label>
+    </fieldset>
+    <div class="actions"><button class="primary" id="btnStart" data-en="Start practice">Comenzar práctica</button><button id="btnResume" class="hidden" data-en="Resume saved practice">Reanudar práctica guardada</button></div>
+    <p id="resumeNote" class="muted hidden"></p>
     <div id="startErr" class="status bad hidden"></div>
   </div>
   <p class="muted" style="font-size:.8rem">Material de práctica elaborado para entrenamiento interno. No es contenido oficial de Anthropic ni reproduce preguntas del examen real.</p>
@@ -120,6 +129,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 <div id="exam" class="hidden">
   <div class="topbar"><div class="row">
     <strong style="font-size:.95rem">__CODE__</strong>
+    <span id="practiceLabel" class="pill"></span>
     <div class="progress" aria-label="Progreso"><i id="progBar"></i></div>
     <span id="progTxt" class="muted" style="font-size:.9rem">0/__ITEMS__</span>
     <span id="timer" class="timer">--:--</span>
@@ -137,7 +147,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="card">
       <div id="saveStatus" class="status warn">El avance se guardará al comenzar.</div>
-      <div class="actions"><button class="primary" id="btnSubmit">Enviar examen</button></div>
+      <div class="actions"><button class="primary" id="btnSubmit" data-en="Finish practice">Finalizar práctica</button></div>
     </div>
   </div>
 </div>
@@ -160,7 +170,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     <h2>Resultado por área del banco</h2>
     <table><thead><tr><th>Dominio</th><th class="num">Aciertos</th><th class="num">%</th></tr></thead><tbody id="rDomains"></tbody></table>
   </div>
-  <div class="card">
+  <div class="card hidden" id="reviewPanel">
     <h2>Revisión de respuestas</h2>
     <div class="filter">
       <button data-f="all" class="on">Todas</button>
@@ -182,7 +192,55 @@ var PASS = 0.72;
 var $ = function(id){ return document.getElementById(id); };
 function localText(q,key){ return LANG==="en" ? (q[key+"_en"] || q[key]) : q[key]; }
 function domainText(d){ var i=EXAM.domains.indexOf(d); return LANG==="en"&&i>=0?(EXAM.domains_en[i]||d):d; }
-var state = { name:"", email:"", attemptId:"", startedAt:"", order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, heartbeatId:null, saveTimer:null, saveQueue:Promise.resolve(), submitted:false, payload:null };
+var state = { name:"", email:"", attemptId:"", startedAt:"", feedbackMode:"immediate", verified:[], order:[], answers:{}, marked:{}, current:0, start:0, end:0, timerId:null, heartbeatId:null, saveTimer:null, saveQueue:Promise.resolve(), submitted:false, payload:null };
+var MEMORY_KEY="claude-study-"+EXAM.code;
+function text(es,en){return LANG==="en"?en:es;}
+function remember(){
+  if(!state.attemptId) return;
+  try { sessionStorage.setItem(MEMORY_KEY,JSON.stringify({version:EXAM.contentVersion,name:state.name,email:state.email,
+    attemptId:state.attemptId,startedAt:state.startedAt,feedbackMode:state.feedbackMode,verified:state.verified,
+    order:state.order,answers:state.answers,marked:state.marked,current:state.current,start:state.start,end:state.end,
+    submitted:state.submitted,payload:state.payload})); } catch { /* D1 saving still works if browser storage is unavailable. */ }
+}
+function savedPractice(){
+  try {
+    var s=JSON.parse(sessionStorage.getItem(MEMORY_KEY)||"null");
+    if(!s||s.version!==EXAM.contentVersion||!["immediate","none"].includes(s.feedbackMode)||!Array.isArray(s.order)||s.order.length!==EXAM.itemCount) return null;
+    if(!Number.isFinite(s.start)||s.end!==s.start+MINUTES*60000||!Array.isArray(s.verified)||!s.answers||!s.marked||!Number.isInteger(s.current)||s.current<0||s.current>=s.order.length) return null;
+    if(s.feedbackMode==="none"&&s.verified.length) return null;
+    if(new Set(s.order.map(function(x){return x.idx;})).size!==s.order.length) return null;
+    if(s.order.some(function(x){var q=EXAM.questions[x.idx];return !q||!Array.isArray(x.opts)||x.opts.length!==q.o.length||new Set(x.opts).size!==x.opts.length||x.opts.some(function(k){return !Number.isInteger(k)||k<0||k>=q.o.length;});})) return null;
+    if(s.verified.some(function(n){return !Number.isInteger(n)||n<0||n>=s.order.length||s.answers[n]===undefined;})) return null;
+    return s;
+  } catch { return null; }
+}
+function resourcesHtml(q){
+  return '<p><strong>'+text("Recurso oficial:","Official resource:")+'</strong> '+(EXAM.resources[q.d]||[]).map(function(r){
+    return '<a target="_blank" rel="noopener noreferrer" href="'+esc(r.url)+'">'+esc(LANG==="en"?r.title_en:r.title)+'</a> '+text("(en inglés)","(English)");
+  }).join(' · ')+'</p>';
+}
+function feedbackHtml(q,answer){
+  return '<strong>'+text(isCorrect(q,answer)?"Respuesta correcta":"Respuesta incorrecta",isCorrect(q,answer)?"Correct answer":"Incorrect answer")+'</strong>'+
+    '<p>'+text("Respuesta correcta: ","Correct answer: ")+(Array.isArray(q.a)?q.a:[q.a]).map(function(k){return fmt((LANG==="en"?q.o_en:q.o)[k]);}).join(' + ')+'</p>'+
+    '<p><strong>'+text("Explicación: ","Explanation: ")+'</strong>'+fmt(localText(q,"e"))+'</p>'+
+    '<p>'+text("Dominio: ","Domain: ")+esc(localText(q,"d"))+'</p>'+resourcesHtml(q);
+}
+function renderFeedback(n){
+  if(state.feedbackMode!=="immediate") return;
+  var card=$("q"+n), verified=state.verified.indexOf(n)>=0, q=EXAM.questions[state.order[n].idx];
+  card.querySelectorAll("input").forEach(function(input){input.disabled=verified;});
+  var button=card.querySelector(".verify-answer");
+  button.disabled=verified||state.answers[n]===undefined||(isMulti(q)&&state.answers[n].length!==q.a.length);
+  button.textContent=verified?text("Respuesta verificada","Answer verified"):text("Verificar respuesta","Verify answer");
+  var feedback=card.querySelector(".feedback-result");
+  feedback.classList.toggle("hidden",!verified);
+  feedback.innerHTML=verified?feedbackHtml(q,state.answers[n]):"";
+}
+function verifyAnswer(n){
+  var q=EXAM.questions[state.order[n].idx], answer=state.answers[n];
+  if(state.submitted||state.feedbackMode!=="immediate"||state.verified.indexOf(n)>=0||answer===undefined||(isMulti(q)&&answer.length!==q.a.length)) return;
+  state.verified.push(n); renderFeedback(n); updateQuestionStatus(); scheduleSave();
+}
 
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
@@ -210,10 +268,10 @@ $("btnStart").addEventListener("click", async function(){
     var response=await fetch("/api/admission/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e})});
     var result=await response.json();
     if(!response.ok) throw new Error(result.error||"No se pudo validar el acceso.");
-    state.name=n; state.email=e; begin();
+    state.name=n; state.email=e; state.feedbackMode=document.querySelector('input[name="feedbackMode"]:checked').value; begin();
   } catch(error) {
     err.textContent=error.message||"No se pudo validar el acceso. Intenta de nuevo."; err.classList.remove("hidden");
-  } finally { button.disabled=false; button.textContent="Comenzar examen"; }
+  } finally { button.disabled=false; button.textContent=text("Comenzar práctica","Start practice"); }
 });
 
 // Sortea las preguntas del banco respetando la cuota definida para cada área
@@ -225,12 +283,14 @@ function pick(){
   });
   return shuffle(chosen);
 }
-function begin(){
-  state.attemptId=crypto.randomUUID();
-  state.startedAt=new Date().toISOString();
-  state.order = pick().map(function(i){
-    return { idx:i, opts: shuffle(EXAM.questions[i].o.map(function(_,k){return k;})) };
-  });
+function begin(saved){
+  if(saved) Object.assign(state,saved);
+  else {
+    state.attemptId=crypto.randomUUID(); state.startedAt=new Date().toISOString();
+    state.start=Date.now(); state.end=state.start+MINUTES*60000;
+    state.order = pick().map(function(i){return { idx:i, opts: shuffle(EXAM.questions[i].o.map(function(_,k){return k;})) };});
+  }
+  $("practiceLabel").textContent=state.feedbackMode==="immediate"?text("Práctica guiada","Guided practice"):text("Práctica sin feedback","Practice without feedback");
   var box=$("questions"), grid=$("navGrid"), html="", g="";
   state.order.forEach(function(item,n){
     var q=EXAM.questions[item.idx], multi=isMulti(q);
@@ -240,13 +300,21 @@ function begin(){
     item.opts.forEach(function(k,j){
       html += '<label class="opt" data-n="'+n+'"><input type="'+(multi?"checkbox":"radio")+'" name="r'+n+'" value="'+k+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(LANG==="en"?(q.o_en||q.o)[k]:q.o[k])+'</span></label>';
     });
+    if(state.feedbackMode==="immediate") html+='<button type="button" class="verify-answer" data-verify="'+n+'">'+text("Verificar respuesta","Verify answer")+'</button><div class="feedback-result hidden" role="status" aria-live="polite"></div>';
     html += '</div>';
     g += '<a href="#q'+n+'" id="nav'+n+'" data-index="'+n+'" aria-label="'+(LANG==="en"?"Go to question ":"Ir a pregunta ")+(n+1)+'">'+(n+1)+'</a>';
   });
   box.innerHTML=html; grid.innerHTML=g;
+  state.order.forEach(function(_,n){
+    $("q"+n).querySelectorAll("input").forEach(function(input){input.checked=has(state.answers[n],+input.value);});
+    $("q"+n).querySelectorAll(".opt").forEach(function(option){option.classList.toggle("sel",option.querySelector("input").checked);});
+    renderFeedback(n);
+  });
+  box.addEventListener("click",function(ev){var button=ev.target.closest("[data-verify]");if(button) verifyAnswer(+button.dataset.verify);});
   box.addEventListener("change", function(ev){
     var t=ev.target; if(t.type!=="radio" && t.type!=="checkbox") return;
     var lab=t.closest(".opt"), n=+lab.dataset.n, card=lab.parentNode;
+    if(state.verified.indexOf(n)>=0) return;
     if(t.type==="radio"){
       state.answers[n]=+t.value;
     } else {
@@ -259,6 +327,7 @@ function begin(){
     card.querySelectorAll(".opt").forEach(function(o){ o.classList.toggle("sel", o.querySelector("input").checked); });
     updateProgress();
     updateQuestionStatus();
+    renderFeedback(n);
     scheduleSave();
   });
   grid.addEventListener("click", function(ev){
@@ -276,12 +345,12 @@ function begin(){
   });
   $("start").classList.add("hidden"); $("exam").classList.remove("hidden");
   window.scrollTo(0,0);
-  showQuestion(0);
-  state.start=Date.now(); state.end=state.start+MINUTES*60000;
-    saveAttempt("in_progress");
+  showQuestion(state.current); updateProgress();
+  if(saved&&saved.submitted){state.submitted=false;finish(Date.now()>=state.end);return;}
+  remember(); saveAttempt("in_progress");
   state.heartbeatId=setInterval(function(){ saveAttempt(state.submitted?"completed":"in_progress"); },30000);
-  tick(); state.timerId=setInterval(tick,1000);
-  window.addEventListener("beforeunload", guard);
+  tick();
+  if(!state.submitted){state.timerId=setInterval(tick,1000);window.addEventListener("beforeunload", guard);}
 }
 function guard(e){ if(!state.submitted){ e.preventDefault(); e.returnValue=""; } }
 function updateProgress(){
@@ -302,7 +371,7 @@ function showQuestion(index){
   scheduleSave();
 }
 function updateQuestionStatus(){
-  $("questionStatus").textContent=(state.answers[state.current]!==undefined?"Respondida":"Sin responder")+(state.marked[state.current]?" · Marcada para revisar":"");
+  $("questionStatus").textContent=(state.verified.indexOf(state.current)>=0?text("Verificada","Verified"):(state.answers[state.current]!==undefined?"Respondida":"Sin responder"))+(state.marked[state.current]?" · Marcada para revisar":"");
 }
 function updateNavigation(){
   state.order.forEach(function(_,i){
@@ -351,7 +420,9 @@ function finish(timeout){
     domTxt.push(d+": "+x.ok+"/"+x.total+" ("+p+"%)");
   });
   $("rDomains").innerHTML=rows;
-  renderReview();
+  $("reviewPanel").classList.toggle("hidden",state.feedbackMode!=="immediate");
+  if(state.feedbackMode==="immediate") renderReview();
+  else {$("review").innerHTML="";$("rGrid").innerHTML="";}
 
   state.payload = { attemptId:state.attemptId, examCode:EXAM.code, participantName:state.name,
     email:state.email, status:"completed", startedAt:state.startedAt, questionCount:EXAM.itemCount,
@@ -360,7 +431,8 @@ function finish(timeout){
     correctCount:correct, scorePercent:Math.round(pct*100),
     resultLabel:passed?(LANG==="en"?"Practice threshold reached":"Umbral de práctica alcanzado"):(LANG==="en"?"Below practice threshold":"Bajo el umbral de práctica"),
     answers:state.answers, marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),
-    areas:doms };
+    areas:doms,feedbackMode:state.feedbackMode,verified:state.verified };
+  remember();
   send();
 }
 
@@ -376,7 +448,7 @@ function renderReview(){
       html+='<div class="opt'+cls+'"><span><strong>'+LETTERS[j]+'.</strong> '+fmt(LANG==="en"?(q.o_en||q.o)[k]:q.o[k])+(mine?' <em class="muted">('+(LANG==="en"?"your answer":"tu respuesta")+')</em>':'')+'</span></div>';
     });
     if(a===undefined) html+='<p class="muted" style="margin:4px 0 0">'+(LANG==="en"?"Unanswered.":"Sin responder.")+'</p>';
-    html+='<div class="explain"><strong>'+(LANG==="en"?"Explanation:":"Explicación:")+'</strong> '+fmt(localText(q,"e"))+'</div></div>';
+    html+='<div class="explain"><strong>'+(LANG==="en"?"Explanation:":"Explicación:")+'</strong> '+fmt(localText(q,"e"))+resourcesHtml(q)+'</div></div>';
     g+='<a href="#rv'+n+'" class="'+(ok?"ok":"ko")+'">'+(n+1)+'</a>';
   });
   $("review").innerHTML=html; $("rGrid").innerHTML=g;
@@ -392,6 +464,7 @@ document.querySelectorAll(".filter button").forEach(function(btn){
 
 function setStatus(cls,msg){ var s=$("sendStatus"); s.className="status "+cls; s.textContent=msg; }
 function scheduleSave(){
+  remember();
   if(state.submitted) return;
   clearTimeout(state.saveTimer);
   state.saveTimer=setTimeout(function(){ saveAttempt("in_progress"); },700);
@@ -411,7 +484,7 @@ function saveAttempt(status,exitedAt){
     participantName:state.name,email:state.email,status:"in_progress",startedAt:state.startedAt,
     questionCount:EXAM.itemCount,answeredCount:Object.keys(state.answers).length,elapsedSeconds:elapsed,
     currentQuestion:state.current+1,markedCount:Object.keys(state.marked).filter(function(k){return state.marked[k];}).length,
-    answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),areas:currentAreas()};
+    answers:state.answers,marked:Object.keys(state.marked).filter(function(k){return state.marked[k];}).map(Number),areas:currentAreas(),feedbackMode:state.feedbackMode,verified:state.verified};
   if(!data) return Promise.resolve();
   if(status!=="completed"&&exitedAt) data.exitedAt=exitedAt;
   state.saveQueue=state.saveQueue.catch(function(){}).then(function(){
@@ -419,7 +492,7 @@ function saveAttempt(status,exitedAt){
       .then(function(r){return r.json().then(function(d){if(!r.ok) throw new Error(d.error||"HTTP "+r.status);return d;});});
   });
   return state.saveQueue.then(function(){
-    if(status==="completed") setStatus("ok","Resultado guardado correctamente. El equipo puede verlo en el panel privado.");
+    if(status==="completed") {setStatus("ok","Resultado guardado correctamente. El equipo puede verlo en el panel privado.");try{sessionStorage.removeItem(MEMORY_KEY);}catch{}}
     else { $("saveStatus").className="status ok"; $("saveStatus").textContent="Avance guardado · "+new Date().toLocaleTimeString("es"); }
   }).catch(function(error){
     if(status==="completed") { setStatus("bad","No se pudo guardar el resultado: "+error.message+". Reintenta el guardado."); $("btnRetrySend").classList.remove("hidden"); }
@@ -434,6 +507,19 @@ function send(){
   saveAttempt("completed");
 }
 window.addEventListener("pagehide",function(){if(state.attemptId&&!state.submitted) saveAttempt("in_progress",new Date().toISOString());});
+var saved=savedPractice();
+if(saved){
+  $("btnResume").classList.remove("hidden");$("resumeNote").classList.remove("hidden");
+  $("resumeNote").textContent=saved.name+" · "+(saved.feedbackMode==="immediate"?text("Con feedback","With feedback"):text("Sin feedback","Without feedback"))+" · "+text("Guardado en esta pestaña. El reloj continúa durante una recarga.","Saved in this tab. The clock continues during a reload.");
+}
+$("btnResume").addEventListener("click",async function(){
+  var saved=savedPractice();if(!saved) return;
+  $("btnResume").disabled=true;
+  try{var response=await fetch("/api/admission/check",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:saved.email})});
+    if(!response.ok) throw Error(text("No se pudo validar la admisión.","Could not verify access."));begin(saved);
+  }catch(error){$("startErr").textContent=error.message;$("startErr").classList.remove("hidden");}
+  finally{$("btnResume").disabled=false;}
+});
 })();
 </script>
 <script src="i18n.js"></script>

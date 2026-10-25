@@ -1,10 +1,10 @@
 # Progreso: simulación de condiciones oficiales
 
 **Actualizado:** 2026-10-25  
-**Porcentaje total ponderado:** **50.6%**  
-**Último commit confirmado al iniciar este bloque:** `553594c` — Document official-conditions simulation specification  
-**Tarea activa:** Interfaz de simulación  
-**Siguiente paso verificable:** crear una pantalla en inglés que consuma los endpoints de simulación y comprobar que no se genera HTML público con claves de respuesta.
+**Porcentaje total ponderado:** **72.9%**  
+**Último commit confirmado al iniciar este bloque:** `48777aa` — Add secure server-side simulation attempts  
+**Tarea activa:** Migración, despliegue y validación  
+**Siguiente paso verificable:** aplicar la migración `0005` en D1 remoto antes de publicar el Worker y comprobar `/api/simulation/profiles` y la administración en el sitio desplegado.
 
 ## Regla de cálculo
 
@@ -16,10 +16,10 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | Blueprint versionado y cuotas | 10% | 100% | Completada | Configuración y prueba de cuotas en este bloque | `build/official_profiles.py`, `tests/test_official_profiles.py` | Usar estos perfiles como única fuente de selección |
 | Banco seguro y claves privadas | 18% | 90% | En curso | Banco Worker generado con claves privadas; selector y prueba demuestran que la carga pública no contiene `answer` | `build/build.py`, `src/generated/simulation-data.js`, `src/simulation.mjs`, `tests/simulation.test.mjs` | Comprobar el endpoint real al habilitar el primer perfil editorial |
 | Migración D1 y API de intentos | 12% | 85% | En curso | Migración 0005 y endpoints para inicio, avance, envío, vencimiento y corrección servidor; bundle validado en seco | `migrations/0005_simulation_attempts.sql`, `src/index.js`, `src/simulation.mjs` | Aplicar migración remota y recorrer un intento habilitado |
-| Interfaz de simulación | 14% | 0% | Pendiente | — | — | Crear pantalla de simulación en inglés, navegación y marcas |
-| Integridad y panel administrativo | 10% | 0% | Pendiente | — | — | Registrar eventos mínimos y añadir vista privada de simulaciones |
+| Interfaz de simulación | 14% | 90% | En curso | Página inglesa de simulación, reloj según vencimiento, navegación, marcas, reanudación y resultado agregado; prueba verifica que el HTML no contiene campo de claves | `build/simulation.html`, `examenes/simulation.html`, `src/index.js`, `tests/simulation.test.mjs` | Recorrerla contra un perfil editorial habilitado |
+| Integridad y panel administrativo | 10% | 90% | En curso | Eventos mínimos en D1; panel filtra por modo, muestra vencimiento, versión, índice, debilidad y detalle bajo demanda sin respuestas ni claves | `src/index.js`, `src/simulation.mjs`, `migrations/0005_simulation_attempts.sql`, `build/admin.html`, `examenes/admin.html` | Validar panel con D1 remoto migrado y un intento habilitado |
 | Contenido y revisión editorial | 16% | 0% | Bloqueada por cobertura editorial | La especificación documenta que el banco actual no alcanza tres formularios por dominio | `docs/especificacion-simulacion-condiciones-oficiales.md` | Clasificar y revisar contenido inglés; completar tres formularios por perfil |
-| Pruebas automatizadas | 7% | 60% | En curso | Cuotas Python; selección, ausencia de claves, corrección de múltiple respuesta, restauración y vencimiento en Node; `wrangler deploy --dry-run` válido | `tests/test_official_profiles.py`, `tests/simulation.test.mjs` | Añadir prueba de API D1 y compatibilidad del recorrido navegador |
+| Pruebas automatizadas | 7% | 70% | En curso | Cuotas Python; selección, ausencia de claves, corrección de múltiple respuesta, restauración, vencimiento y verificación del HTML público; `wrangler deploy --dry-run` válido | `tests/test_official_profiles.py`, `tests/simulation.test.mjs` | Añadir prueba de API D1 y recorrido navegador con un perfil habilitado |
 | Migración, despliegue y validación | 3% | 0% | Pendiente | — | — | Aplicar migraciones, desplegar y recorrer un intento real |
 
 ## Bloqueadores
@@ -33,7 +33,8 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 |---|---|---|
 | 2026-10-25 | `553594c` | Especificación con fuentes oficiales, perfiles, seguridad y puerta editorial. |
 | 2026-10-25 | `fe65692` | Blueprints, cálculo de cuotas, separación inicial de banco privado y prueba de cuotas. |
-| 2026-10-25 | Pendiente al confirmar este bloque | Worker, migración D1, selección segura, corrección servidor y pruebas de unidad. |
+| 2026-10-25 | `48777aa` | Worker, migración D1, selección segura, corrección servidor y pruebas de unidad. |
+| 2026-10-25 | Pendiente al confirmar este bloque | Interfaz inglesa, panel de simulación, detalles privados de integridad y pruebas del HTML público. |
 
 ## Protocolo de continuación
 

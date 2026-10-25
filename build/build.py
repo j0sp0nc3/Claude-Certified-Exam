@@ -21,6 +21,8 @@ GENERATED = ROOT.parent / "src" / "generated"
 GENERATED.mkdir(exist_ok=True)
 tpl = (ROOT / "template.html").read_text(encoding="utf-8")
 shutil.copyfile(ROOT / "i18n.js", OUT / "i18n.js")
+shutil.copyfile(ROOT / "simulation.html", OUT / "simulation.html")
+shutil.copyfile(ROOT / "admin.html", OUT / "admin.html")
 translations_en = json.loads((ROOT / "translations_en.json").read_text(encoding="utf-8")) if (ROOT / "translations_en.json").exists() else {}
 
 cards = []
@@ -142,7 +144,7 @@ print("OK src/generated/simulation-data.js")
 
 items = "".join(
     f'<a class="card" href="{c["file"]}"><span class="pill">{c["code"]}</span><h2 data-en="{html.escape(translations_en.get(c["code"], {}).get("title", c["title"]))}">{html.escape(c["title"])}</h2>'
-    f'<p data-en="{html.escape(translations_en.get(c["code"], {}).get("desc", c["desc"]))}">{html.escape(c["desc"])}</p><span class="go">Iniciar simulacro →</span></a>' for c in cards)
+    f'<p data-en="{html.escape(translations_en.get(c["code"], {}).get("desc", c["desc"]))}">{html.escape(c["desc"])}</p><span class="go" data-en="Study mode →">Modo Estudio →</span></a>' for c in cards)
 index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title data-en="Claude Certification Practice Exams">Simulacros Certificación Claude</title><style>
 :root{{--bg:#f6f5f1;--surface:#fff;--text:#1f1e1c;--muted:#6b6862;--border:#dedad2;--accent:#c96442;--pill:#f0eee8}}
@@ -156,6 +158,9 @@ index = f"""<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><meta nam
 .pill{{font-size:.78rem;padding:2px 10px;border-radius:999px;background:var(--pill);color:var(--muted)}}.go{{color:var(--accent);font-weight:600}}
 </style></head><body><div class="wrap"><h1>Simulacros de Certificación Claude</h1>
 <p>Simulacros de práctica en español e inglés con duración de {MINUTES} minutos. Cada examen usa la cantidad de preguntas de su formato de referencia y sortea desde un banco de 100. El umbral interno de práctica es 72 %; no equivale a la puntuación escalada oficial. El avance y los resultados se guardan en el panel privado.</p>
+<h2 style="font-size:1.15rem;margin:30px 0 6px" data-en="Official-conditions simulation">Simulación de condiciones oficiales</h2>
+<p data-en="English-only internal practice, 120 minutes, server-side scoring, and no feedback until submission. A profile becomes available after its reviewed question bank covers three distinct forms.">Práctica interna solo en inglés, 120 minutos, corrección en el servidor y sin feedback hasta el envío. Un perfil se habilita cuando su banco revisado cubre tres formularios distintos.</p>
+<a class="card" href="simulation.html"><span class="pill" data-en="English only · internal preparation">Solo inglés · preparación interna</span><h2 data-en="Start official-conditions simulation">Iniciar simulación de condiciones oficiales</h2><p data-en="This mode never claims an official score equivalence. Availability depends on editorial coverage by certification.">Este modo no afirma equivalencia con un puntaje oficial. La disponibilidad depende de la cobertura editorial por certificación.</p><span class="go" data-en="View availability →">Ver disponibilidad →</span></a>
 <div class="grid">{items}</div>
 <p style="font-size:.8rem;margin-top:24px">Material de práctica para entrenamiento interno. No es contenido oficial de Anthropic.</p></div><script src="i18n.js"></script></body></html>"""
 (OUT / "index.html").write_text(index, encoding="utf-8")

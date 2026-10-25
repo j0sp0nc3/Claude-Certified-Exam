@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -47,4 +48,10 @@ test("restored question order is stable and time expires at the deadline", () =>
   assert.deepEqual(restorePublicQuestions(privateSet, bank), publicQuestions);
   assert.equal(isExpired("2026-10-25T10:00:00.000Z", Date.parse("2026-10-25T09:59:59.999Z")), false);
   assert.equal(isExpired("2026-10-25T10:00:00.000Z", Date.parse("2026-10-25T10:00:00.000Z")), true);
+});
+
+test("public simulation HTML does not embed the Worker answer-key field", () => {
+  const html = readFileSync(new URL("../examenes/simulation.html", import.meta.url), "utf8");
+  assert.equal(/"answer"\s*:/.test(html), false);
+  assert.equal(html.includes("SIMULATION_DATA"), false);
 });

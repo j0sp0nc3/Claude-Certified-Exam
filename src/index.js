@@ -180,11 +180,20 @@ async function listAttempts(request, env) {
     const rows = await env.DB.prepare(`SELECT attempt_id, exam_code, participant_name, email, status,
       started_at, updated_at, finished_at, exit_at, question_count, answered_count, elapsed_seconds,
       current_question, marked_count,
-      correct_count, score_percent, result_label, areas_json FROM attempts ORDER BY started_at DESC LIMIT 2000`).all();
-    return json({ attempts: rows.results || [] });
+      correct_count, score_percent, result_label, areas_json, mode, blueprint_version, deadline_at,
+      completion_reason, integrity_event_count, last_event_at
+      FROM attempts ORDER BY started_at DESC LIMIT 2000`).all();
+    const attempts = (rows.results || []).map(row => {
+      const profile = row.mode === "simulation" ? simulationProfile(row.exam_code) : null;
+      return {
+        ...row,
+        areaNames: profile ? Object.fromEntries(profile.domains.map(domain => [domain.id, domain.name])) : undefined,
+      };
+    });
+    return json({ attempts });
   } catch (error) {
     console.error("D1 read failed", error);
-    return json({ error: "No se pudieron cargar los resultados." }, 503);
+    return json({ error: "No se pudieron cargar los resultados. Verifica que la migración 0005 esté aplicada." }, 503);
   }
 }
 
@@ -376,7 +385,7 @@ async function loadSimulation(request, env, attemptId) {
     }
     if (row.status === "completed") return json({ attempt: simulationAttemptView(row, profile), result: storedSimulationResult(row, profile) });
     const { questions } = publicQuestionsForAttempt(row);
-    return json({ attempt: simulationAttemptView(row, profile), questions });
+    return json({ attempt: simulationAttemptView(row, profile), questions, responses: parseStoredJson(row.answers_json, {}) });
   } catch (error) {
     console.error("Simulation load failed", error);
     return json({ error: "No se pudo recuperar la simulación. Verifica que la migración 0005 esté aplicada." }, 503);

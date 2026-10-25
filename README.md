@@ -82,6 +82,12 @@ npx wrangler d1 migrations apply claude-exam-results --remote
 
 También puedes abrir la base en Cloudflare Dashboard → **D1 SQL Database** → **Console** y ejecutar el contenido de los archivos de `migrations/` en orden.
 
+### Simulación de condiciones oficiales
+
+`/simulation.html` es una experiencia separada de **Estudio**: funciona solo en inglés, dura 120 minutos, corrige en el Worker y entrega un Índice de preparación. Nunca calcula una equivalencia con un puntaje oficial.
+
+Antes de habilitar una certificación, aplica las migraciones `0005` y `0006` y carga sus preguntas originales revisadas en el banco privado D1. Sus enunciados y claves no se versionan en Git ni se publican como assets. El modo Estudio mantiene sus explicaciones y claves visibles para aprendizaje, así que no se reutiliza como banco de simulación. Consulta [la guía de carga privada](docs/carga-banco-privado-simulacion.md).
+
 Antes de consultar el panel, crea un secreto `ADMIN_TOKEN` en Workers & Pages → `claude-certified-exam` → **Settings** → **Variables and Secrets**. Usa una clave aleatoria privada y no la guardes en Git. Después abre `/admin.html` e ingresa esa clave para revisar intentos, exportarlos a CSV y configurar la admisión.
 
 En el panel privado, **Admisión al examen** mantiene reglas individuales en una tabla: hasta 50 dominios y 100 correos exactos. Un participante puede iniciar si coincide con cualquiera de las reglas; el Worker genera una expresión regular segura para cada entrada y la evalúa antes de iniciar y al guardar el avance. El valor inicial es `nxtara.com`; modifica, agrega o quita reglas desde el panel y pulsa **Guardar reglas**. Un campo de correo no verifica quién es su dueño: para comprobar identidad, protege también el sitio con Cloudflare Access y One-time PIN.
@@ -102,3 +108,5 @@ Publica `examenes/` como sitio estático en esa URL. Para restringir el acceso a
 El permiso de admisión compara el correo ingresado con el dominio o la lista configurada; por sí solo no verifica la identidad de la persona. Para verificar identidad, activar Cloudflare Access con código de un solo uso (One-time PIN).
 
 Las respuestas correctas viajan dentro del HTML y la puntuación se calcula en el navegador; una persona con conocimientos técnicos podría verlas o alterar un resultado. El panel sirve para seguimiento de práctica, no para una evaluación formal supervisada.
+
+Esta limitación aplica al modo **Estudio**. La Simulación de condiciones oficiales permanece no disponible hasta que exista un banco privado D1 con cobertura revisada para tres formularios por dominio.

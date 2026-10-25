@@ -1,10 +1,10 @@
 # Progreso: simulación de condiciones oficiales
 
 **Actualizado:** 2026-10-25  
-**Porcentaje total ponderado:** **72.9%**  
+**Porcentaje total ponderado:** **70.3%**
 **Último commit confirmado al iniciar este bloque:** `48777aa` — Add secure server-side simulation attempts  
 **Tarea activa:** Migración, despliegue y validación  
-**Siguiente paso verificable:** aplicar la migración `0005` en D1 remoto antes de publicar el Worker y comprobar `/api/simulation/profiles` y la administración en el sitio desplegado.
+**Siguiente paso verificable:** aplicar las migraciones `0005` y `0006` en D1 remoto, cargar el primer banco privado aprobado y comprobar `/api/simulation/profiles` y la administración en el sitio desplegado.
 
 ## Regla de cálculo
 
@@ -14,18 +14,19 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 |---|---:|---:|---|---|---|---|
 | Investigación y especificación oficial | 10% | 100% | Completada | `553594c`; fuentes, fecha y restricciones documentadas | `docs/especificacion-simulacion-condiciones-oficiales.md` | Revisar fuentes cuando Anthropic publique una guía nueva |
 | Blueprint versionado y cuotas | 10% | 100% | Completada | Configuración y prueba de cuotas en este bloque | `build/official_profiles.py`, `tests/test_official_profiles.py` | Usar estos perfiles como única fuente de selección |
-| Banco seguro y claves privadas | 18% | 90% | En curso | Banco Worker generado con claves privadas; selector y prueba demuestran que la carga pública no contiene `answer` | `build/build.py`, `src/generated/simulation-data.js`, `src/simulation.mjs`, `tests/simulation.test.mjs` | Comprobar el endpoint real al habilitar el primer perfil editorial |
-| Migración D1 y API de intentos | 12% | 85% | En curso | Migración 0005 y endpoints para inicio, avance, envío, vencimiento y corrección servidor; bundle validado en seco | `migrations/0005_simulation_attempts.sql`, `src/index.js`, `src/simulation.mjs` | Aplicar migración remota y recorrer un intento habilitado |
+| Banco seguro y claves privadas | 18% | 70% | En curso | El repositorio contiene solo metadata de blueprint; banco y claves pasarán a D1 privado. Pruebas verifican que ni HTML ni metadata versionada llevan claves | `build/build.py`, `src/generated/simulation-profiles.js`, `src/simulation.mjs`, `migrations/0006_private_simulation_bank.sql`, `tests/simulation.test.mjs` | Aplicar 0006 y cargar banco privado revisado |
+| Migración D1 y API de intentos | 12% | 80% | En curso | Endpoints de inicio, avance, envío, vencimiento y corrección consultan banco D1 privado; bundle validado en seco | `migrations/0005_simulation_attempts.sql`, `migrations/0006_private_simulation_bank.sql`, `src/index.js`, `src/simulation.mjs` | Aplicar migraciones remotas y recorrer un intento habilitado |
 | Interfaz de simulación | 14% | 90% | En curso | Página inglesa de simulación, reloj según vencimiento, navegación, marcas, reanudación y resultado agregado; prueba verifica que el HTML no contiene campo de claves | `build/simulation.html`, `examenes/simulation.html`, `src/index.js`, `tests/simulation.test.mjs` | Recorrerla contra un perfil editorial habilitado |
 | Integridad y panel administrativo | 10% | 90% | En curso | Eventos mínimos en D1; panel filtra por modo, muestra vencimiento, versión, índice, debilidad y detalle bajo demanda sin respuestas ni claves | `src/index.js`, `src/simulation.mjs`, `migrations/0005_simulation_attempts.sql`, `build/admin.html`, `examenes/admin.html` | Validar panel con D1 remoto migrado y un intento habilitado |
 | Contenido y revisión editorial | 16% | 0% | Bloqueada por cobertura editorial | La especificación documenta que el banco actual no alcanza tres formularios por dominio | `docs/especificacion-simulacion-condiciones-oficiales.md` | Clasificar y revisar contenido inglés; completar tres formularios por perfil |
-| Pruebas automatizadas | 7% | 70% | En curso | Cuotas Python; selección, ausencia de claves, corrección de múltiple respuesta, restauración, vencimiento y verificación del HTML público; `wrangler deploy --dry-run` válido | `tests/test_official_profiles.py`, `tests/simulation.test.mjs` | Añadir prueba de API D1 y recorrido navegador con un perfil habilitado |
-| Migración, despliegue y validación | 3% | 0% | Pendiente | — | — | Aplicar migraciones, desplegar y recorrer un intento real |
+| Pruebas automatizadas | 7% | 75% | En curso | Cuotas Python; selección, ausencia de claves en HTML y metadata; corrección de múltiple respuesta, restauración y vencimiento; `wrangler deploy --dry-run` válido | `tests/test_official_profiles.py`, `tests/simulation.test.mjs` | Añadir prueba de API D1 y recorrido navegador con un perfil habilitado |
+| Migración, despliegue y validación | 3% | 40% | En curso | Workers Builds publicó interfaz, panel y endpoint de perfiles; ejecución remota de Wrangler bloqueada por token local inválido | `535751c`, comprobación HTTPS de `/simulation.html` y `/api/simulation/profiles` | Aplicar 0005/0006 con credencial Cloudflare y validar D1 |
 
 ## Bloqueadores
 
 1. **Cobertura editorial:** ningún perfil debe marcarse disponible hasta tener tres veces la cuota de cada dominio, preguntas originales y revisión en inglés. El banco actual tiene 100 preguntas por examen, pero todavía no está clasificado por toda la taxonomía oficial de CCAO-F, CCDV-F y CCAR-P.
-2. **Despliegue D1:** las migraciones futuras requieren aplicarse en la base remota antes de habilitar los endpoints correspondientes.
+2. **Despliegue D1:** `0005` y `0006` aún requieren aplicarse en la base remota. Wrangler no pudo autenticarse porque falta `CLOUDFLARE_API_TOKEN` válido en esta sesión.
+3. **Banco privado:** no se debe cargar contenido ni claves de simulación en Git, assets estáticos o el banco de Estudio. La primera carga debe permanecer en un archivo privado y ser revisada antes de marcar filas como `approved`.
 
 ## Bitácora de evidencia
 
@@ -34,7 +35,8 @@ El porcentaje total es la suma de `peso × avance de tarea`. Una tarea solo avan
 | 2026-10-25 | `553594c` | Especificación con fuentes oficiales, perfiles, seguridad y puerta editorial. |
 | 2026-10-25 | `fe65692` | Blueprints, cálculo de cuotas, separación inicial de banco privado y prueba de cuotas. |
 | 2026-10-25 | `48777aa` | Worker, migración D1, selección segura, corrección servidor y pruebas de unidad. |
-| 2026-10-25 | Pendiente al confirmar este bloque | Interfaz inglesa, panel de simulación, detalles privados de integridad y pruebas del HTML público. |
+| 2026-10-25 | `535751c` | Interfaz inglesa, panel de simulación, detalles privados de integridad y pruebas del HTML público. |
+| 2026-10-25 | Pendiente al confirmar este bloque | Banco privado D1, eliminación de claves versionadas, validación de metadata y migración 0006. |
 
 ## Protocolo de continuación
 

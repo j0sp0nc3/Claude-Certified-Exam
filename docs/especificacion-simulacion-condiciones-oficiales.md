@@ -91,13 +91,41 @@ La distribución aplica el método de **resto mayor** para convertir ponderacion
 ## 4. Diseño de seguridad y flujo del intento
 
 1. El navegador solicita `POST /api/simulation/attempts` con certificación e identidad admitida.
-2. El Worker valida admisión, toma una versión de blueprint, selecciona preguntas por cuota y crea un intento D1 con vencimiento de 120 minutos.
+2. El Worker valida admisión, toma una versión de blueprint, selecciona preguntas por cuota desde el banco privado D1 y crea un intento con vencimiento de 120 minutos.
 3. El Worker responde solamente con identificadores, texto, alternativas y tipo de pregunta. Las claves no se publican en HTML, JSON estático ni respuestas de API.
 4. El navegador guarda respuestas mediante `PATCH /api/simulation/attempts/:id/progress` y reporta eventos mínimos de integridad.
 5. Al enviar o vencer, `POST /api/simulation/attempts/:id/submit` corrige en el Worker usando claves privadas, persiste el resultado y devuelve el Índice de preparación.
 6. Las consultas administrativas entregan resúmenes y detalle privado. Nunca devuelven claves correctas a un participante.
 
 El tiempo se calcula con el vencimiento emitido por el servidor. El reloj local es una visualización y nunca una autoridad para corregir.
+
+### Banco privado de simulación
+
+Las preguntas de **Simulación de condiciones oficiales** se almacenan en la tabla D1 `simulation_question_bank`. Cada fila contiene el identificador, certificación, versión de blueprint, dominio oficial, enunciado y alternativas (`question_json`), clave (`answer_json`), tipo de respuesta y las marcas de revisión editorial y técnica.
+
+- El repositorio solo versiona metadatos de blueprint en `src/generated/simulation-profiles.js`; no versiona enunciados ni claves de este banco.
+- Los archivos estáticos, incluido `simulation.html`, nunca incluyen el banco ni una propiedad de respuesta correcta.
+- El Worker solo selecciona filas `approved` con ambas marcas de revisión. Las preguntas retiradas se conservan en D1 para restaurar intentos ya iniciados, pero no entran en nuevos conjuntos.
+- La carga se realiza desde un archivo privado fuera de Git mediante una operación D1 restringida. No se deben reutilizar las preguntas del modo Estudio: sus claves son visibles por diseño para facilitar el aprendizaje.
+
+Estructura de contenido por fila:
+
+```json
+{
+  "question_id": "CCAR-F-2026-001",
+  "exam_code": "CCAR-F",
+  "blueprint_version": "2026.07-v1",
+  "official_domain_id": "agentic-architecture-orchestration",
+  "question_json": {"question": "…", "options": ["…", "…", "…", "…"]},
+  "answer_json": [1],
+  "multiple_response": 0,
+  "status": "approved",
+  "editorial_reviewed_at": "2026-10-25T00:00:00Z",
+  "technical_reviewed_at": "2026-10-25T00:00:00Z"
+}
+```
+
+`answer_json` usa índices de alternativa antes de la aleatorización. Para selección múltiple contiene todos los índices correctos. La API no devuelve ese campo al participante.
 
 ## 5. Datos y auditoría mínima
 

@@ -55,3 +55,10 @@ test("public simulation HTML does not embed the Worker answer-key field", () => 
   assert.equal(/"answer"\s*:/.test(html), false);
   assert.equal(html.includes("SIMULATION_DATA"), false);
 });
+
+test("versioned Worker metadata contains a blueprint but no question bank or keys", () => {
+  const metadata = readFileSync(new URL("../src/generated/simulation-profiles.js", import.meta.url), "utf8");
+  assert.equal(/"answer"\s*:/.test(metadata), false);
+  assert.equal(/"question"\s*:/.test(metadata), false);
+  assert.equal(metadata.includes("SIMULATION_PROFILES"), true);
+});

@@ -1,10 +1,9 @@
-import { SIMULATION_DATA } from "./generated/simulation-data.js";
+import { SIMULATION_PROFILES } from "./generated/simulation-profiles.js";
 import {
   SIMULATION_EVENT_TYPES,
   answeredCount,
   gradeQuestionSet,
   isExpired,
-  publicProfiles,
   restorePublicQuestions,
   secondsRemaining,
   selectQuestionSet,
@@ -198,11 +197,76 @@ async function listAttempts(request, env) {
 }
 
 function simulationProfile(code) {
-  return SIMULATION_DATA.profiles[code] || null;
+  return SIMULATION_PROFILES[code] || null;
 }
 
 function parseStoredJson(value, fallback) {
   try { return JSON.parse(value || ""); } catch { return fallback; }
+}
+
+function privateBankMissing(error) {
+  return /no such table: simulation_question_bank/i.test(String(error?.message || error));
+}
+
+async function simulationQuestionCounts(env) {
+  const rows = await env.DB.prepare(`SELECT exam_code, official_domain_id, COUNT(*) AS available
+    FROM simulation_question_bank
+    WHERE status = 'approved' AND editorial_reviewed_at IS NOT NULL AND technical_reviewed_at IS NOT NULL
+    GROUP BY exam_code, official_domain_id`).all();
+  return new Map((rows.results || []).map(row => [`${row.exam_code}:${row.official_domain_id}`, Number(row.available) || 0]));
+}
+
+function profileWithCoverage(profile, counts) {
+  const domains = profile.domains.map(domain => ({
+    ...domain,
+    available: counts.get(`${profile.code}:${domain.id}`) || 0,
+    required: domain.quota * profile.minimumForms,
+  }));
+  const ready = domains.every(domain => domain.available >= domain.required);
+  return {
+    ...profile,
+    domains,
+    ready,
+    reason: ready ? "Ready" : "Editorial coverage is not ready for three reviewed forms.",
+  };
+}
+
+function privateQuestionFromRow(row) {
+  const content = parseStoredJson(row.question_json, null);
+  const answer = parseStoredJson(row.answer_json, null);
+  if (!content || typeof content.question !== "string" || !Array.isArray(content.options) ||
+    !content.options.every(option => typeof option === "string") || !Array.isArray(answer) ||
+    answer.length === 0 || answer.some(index => !Number.isInteger(index) || index < 0 || index >= content.options.length)) {
+    throw new Error(`Private question ${row.question_id} is malformed`);
+  }
+  if (row.multiple_response !== 1 && answer.length !== 1) throw new Error(`Single-response question ${row.question_id} has multiple answers`);
+  return {
+    id: row.question_id,
+    officialDomainId: row.official_domain_id,
+    question: content.question,
+    options: content.options,
+    multiple: row.multiple_response === 1,
+    answer,
+  };
+}
+
+async function approvedSimulationQuestions(env, profile) {
+  const rows = await env.DB.prepare(`SELECT question_id, official_domain_id, question_json, answer_json, multiple_response
+    FROM simulation_question_bank
+    WHERE exam_code = ? AND blueprint_version = ? AND status = 'approved'
+      AND editorial_reviewed_at IS NOT NULL AND technical_reviewed_at IS NOT NULL`)
+    .bind(profile.code, profile.blueprintVersion).all();
+  return (rows.results || []).map(privateQuestionFromRow);
+}
+
+async function questionsForAttempt(env, privateSet) {
+  if (!privateSet.length) return [];
+  const placeholders = privateSet.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(`SELECT question_id, official_domain_id, question_json, answer_json, multiple_response
+    FROM simulation_question_bank WHERE question_id IN (${placeholders})`).bind(...privateSet.map(question => question.id)).all();
+  const questions = (rows.results || []).map(privateQuestionFromRow);
+  if (questions.length !== privateSet.length) throw new Error("A private question used by this attempt is no longer available");
+  return questions;
 }
 
 function privateQuestionSet(row) {
@@ -280,10 +344,10 @@ async function getSimulationAttempt(env, attemptId, email) {
     FROM attempts WHERE attempt_id = ? AND mode = 'simulation' AND lower(email) = lower(?)`).bind(attemptId, email).first();
 }
 
-function publicQuestionsForAttempt(row) {
+async function publicQuestionsForAttempt(env, row) {
   const privateSet = privateQuestionSet(row);
   if (!privateSet) throw new Error("El conjunto de preguntas del intento no es válido.");
-  return { privateSet, questions: restorePublicQuestions(privateSet, SIMULATION_DATA.questions) };
+  return { privateSet, questions: restorePublicQuestions(privateSet, await questionsForAttempt(env, privateSet)) };
 }
 
 function elapsedSeconds(row, now = Date.now()) {
@@ -303,7 +367,7 @@ async function recordIntegrityEvent(env, attemptId, eventType) {
 
 async function finishSimulationAttempt(env, row, profile, reason, answersOverride = null, markedOverride = null) {
   if (row.status === "completed") return storedSimulationResult(row, profile);
-  const { privateSet, questions } = publicQuestionsForAttempt(row);
+  const { privateSet, questions } = await publicQuestionsForAttempt(env, row);
   const rawAnswers = answersOverride === null ? parseStoredJson(row.answers_json, {}) : answersOverride;
   const responses = validResponses(rawAnswers, privateSet, questions);
   if (responses === null) throw new Error("Las respuestas almacenadas no son válidas.");
@@ -331,8 +395,22 @@ async function finishSimulationAttempt(env, row, profile, reason, answersOverrid
   };
 }
 
-async function simulationProfiles() {
-  return json({ profiles: publicProfiles(SIMULATION_DATA.profiles), source: "internal-practice" });
+async function simulationProfiles(env) {
+  if (!env.DB) return json({ error: "La base de resultados aún no está conectada." }, 503);
+  try {
+    const counts = await simulationQuestionCounts(env);
+    return json({ profiles: Object.values(SIMULATION_PROFILES).map(profile => profileWithCoverage(profile, counts)), source: "internal-practice" });
+  } catch (error) {
+    if (privateBankMissing(error)) {
+      const empty = new Map();
+      return json({ profiles: Object.values(SIMULATION_PROFILES).map(profile => ({
+        ...profileWithCoverage(profile, empty),
+        reason: "Private question bank migration is pending.",
+      })), source: "internal-practice" });
+    }
+    console.error("Simulation profile list failed", error);
+    return json({ error: "No se pudo cargar la disponibilidad de simulaciones." }, 503);
+  }
 }
 
 async function startSimulation(request, env) {
@@ -340,12 +418,13 @@ async function startSimulation(request, env) {
   const parsed = await readSimulationRequest(request, 10_000);
   if (parsed.error) return parsed.error;
   const participant = validParticipant(parsed.body);
-  const profile = simulationProfile(parsed.body.examCode);
-  if (!participant || !profile) return json({ error: "Participante o certificación no válida." }, 400);
-  if (!profile.ready) return json({ error: "Esta simulación aún no está disponible: " + profile.reason, code: "PROFILE_NOT_READY" }, 409);
+  const baseProfile = simulationProfile(parsed.body.examCode);
+  if (!participant || !baseProfile) return json({ error: "Participante o certificación no válida." }, 400);
   try {
     if (!(await isAdmitted(participant.email, env))) return json({ error: "El correo no está autorizado para rendir." }, 403);
-    const selected = selectQuestionSet(profile, SIMULATION_DATA.questions);
+    const profile = profileWithCoverage(baseProfile, await simulationQuestionCounts(env));
+    if (!profile.ready) return json({ error: "Esta simulación aún no está disponible: " + profile.reason, code: "PROFILE_NOT_READY" }, 409);
+    const selected = selectQuestionSet(profile, await approvedSimulationQuestions(env, profile));
     const attemptId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
     const deadlineAt = new Date(Date.now() + profile.timeLimitSeconds * 1000).toISOString();
@@ -366,7 +445,7 @@ async function startSimulation(request, env) {
     }, 201);
   } catch (error) {
     console.error("Simulation start failed", error);
-    return json({ error: "No se pudo iniciar la simulación. Verifica que la migración 0005 esté aplicada." }, 503);
+    return json({ error: "No se pudo iniciar la simulación. Verifica que las migraciones 0005 y 0006 estén aplicadas." }, 503);
   }
 }
 
@@ -384,7 +463,7 @@ async function loadSimulation(request, env, attemptId) {
       return json({ attempt: simulationAttemptView({ ...row, status: "completed" }, profile), result });
     }
     if (row.status === "completed") return json({ attempt: simulationAttemptView(row, profile), result: storedSimulationResult(row, profile) });
-    const { questions } = publicQuestionsForAttempt(row);
+    const { questions } = await publicQuestionsForAttempt(env, row);
     return json({ attempt: simulationAttemptView(row, profile), questions, responses: parseStoredJson(row.answers_json, {}) });
   } catch (error) {
     console.error("Simulation load failed", error);
@@ -408,7 +487,7 @@ async function saveSimulationProgress(request, env, attemptId) {
       return json({ error: "El tiempo de la simulación terminó.", code: "TIME_EXPIRED", result }, 409);
     }
     if (row.status !== "in_progress") return json({ error: "Este intento ya fue finalizado.", result: storedSimulationResult(row, profile) }, 409);
-    const { privateSet, questions } = publicQuestionsForAttempt(row);
+    const { privateSet, questions } = await publicQuestionsForAttempt(env, row);
     const responses = validResponses(parsed.body.answers || {}, privateSet, questions);
     const marked = Array.isArray(parsed.body.marked) ? [...new Set(parsed.body.marked)] : null;
     const questionIds = new Set(privateSet.map(question => question.id));
@@ -442,7 +521,7 @@ async function submitSimulation(request, env, attemptId) {
     const profile = simulationProfile(row.exam_code);
     if (!profile) return json({ error: "El perfil de este intento ya no está disponible." }, 409);
     if (row.status === "completed") return json({ result: storedSimulationResult(row, profile) });
-    const { privateSet, questions } = publicQuestionsForAttempt(row);
+    const { privateSet, questions } = await publicQuestionsForAttempt(env, row);
     const responses = validResponses(parsed.body.answers || {}, privateSet, questions);
     const marked = Array.isArray(parsed.body.marked) ? [...new Set(parsed.body.marked)] : null;
     const questionIds = new Set(privateSet.map(question => question.id));
@@ -500,7 +579,7 @@ export default { async fetch(request, env) {
   if (path.startsWith("/api/")) {
     const simulationPath = path.match(/^\/api\/simulation\/attempts\/([0-9a-f-]{36})(?:\/(progress|submit|events))?$/i);
     const simulationAdminPath = path.match(/^\/api\/admin\/simulation\/attempts\/([0-9a-f-]{36})\/events$/i);
-    if (path === "/api/simulation/profiles" && request.method === "GET") return simulationProfiles();
+    if (path === "/api/simulation/profiles" && request.method === "GET") return simulationProfiles(env);
     if (path === "/api/simulation/attempts" && request.method === "POST") return startSimulation(request, env);
     if (simulationAdminPath && request.method === "GET") return listSimulationEvents(request, env, simulationAdminPath[1]);
     if (simulationPath) {

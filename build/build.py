@@ -1,8 +1,7 @@
-import base64, collections, json, html, pathlib, importlib, shutil
+import base64, json, html, pathlib, importlib, shutil
 
 from official_profiles import (
     BLUEPRINT_VERSION,
-    MIN_FORMS_PER_DOMAIN,
     OFFICIAL_PROFILES,
     SIMULATION_MINUTES,
 )
@@ -26,8 +25,6 @@ shutil.copyfile(ROOT / "admin.html", OUT / "admin.html")
 translations_en = json.loads((ROOT / "translations_en.json").read_text(encoding="utf-8")) if (ROOT / "translations_en.json").exists() else {}
 
 cards = []
-simulation_questions = []
-simulation_profiles = {}
 for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_architect_p"]:
     ex = importlib.import_module(mod).EXAM
     qs = ex["questions"] + importlib.import_module(mod + "_2").QUESTIONS
@@ -58,26 +55,6 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
                 "o": [ok] + wrong, "o_en": translated.get("o", [ok] + wrong), "a": 0,
                 "e": e, "e_en": translated.get("e", e)}
 
-    profile = OFFICIAL_PROFILES[ex["code"]]
-
-    def to_secure_q(index, d, q, ok, wrong, e):
-        """Banco para el Worker: las claves nunca se escriben en assets públicos."""
-        translated = question_translations.get(q, {})
-        options = translated.get("o", ok + wrong if isinstance(ok, list) else [ok] + wrong)
-        correct = list(range(len(ok))) if isinstance(ok, list) else [0]
-        assert len(options) == len(correct) + len(wrong), (mod, q)
-        return {
-            "id": f"{ex['code']}-{index + 1:03d}",
-            "officialDomainId": profile["source_domain_mapping"].get(d),
-            "sourceDomain": d,
-            "question": translated.get("q", q),
-            "options": options,
-            "multiple": isinstance(ok, list),
-            # Esta propiedad queda solamente en src/generated y se empaqueta
-            # en el Worker. El endpoint de inicio la omite explícitamente.
-            "answer": correct,
-        }
-
     for x in qs:
         assert x[0] in ex["domains"], (mod, x[1])
     for d in ex["domains"]:
@@ -90,29 +67,6 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
         "domains": ex["domains"], "domains_en": bank_translation.get("domains", ex["domains"]), "quota": quota,
         "itemCount": item_count,
         "questions": [to_q(i, *x) for i, x in enumerate(qs)],
-    }
-    secure_questions = [to_secure_q(i, *x) for i, x in enumerate(qs)]
-    simulation_questions.extend(secure_questions)
-    available_by_domain = collections.Counter(question["officialDomainId"] for question in secure_questions if question["officialDomainId"])
-    unmapped_source_domains = sorted({question["sourceDomain"] for question in secure_questions if not question["officialDomainId"]})
-    domain_summary = []
-    missing = []
-    for domain in profile["domains"]:
-        required = profile["quota"][domain["id"]] * MIN_FORMS_PER_DOMAIN
-        available = available_by_domain[domain["id"]]
-        domain_summary.append({
-            "id": domain["id"], "name": domain["name"], "weight": domain["weight"],
-            "quota": profile["quota"][domain["id"]], "available": available, "required": required,
-        })
-        if available < required:
-            missing.append(domain["name"])
-    ready = not unmapped_source_domains and not missing
-    reason = "Ready" if ready else "Editorial coverage is not ready for three distinct forms."
-    simulation_profiles[ex["code"]] = {
-        "code": ex["code"], "title": profile["title"], "blueprintVersion": BLUEPRINT_VERSION,
-        "questionCount": profile["question_count"], "timeLimitSeconds": SIMULATION_MINUTES * 60,
-        "language": "en", "ready": ready, "reason": reason, "domains": domain_summary,
-        "unmappedSourceDomains": unmapped_source_domains,
     }
     b64 = base64.b64encode(json.dumps(data, ensure_ascii=False).encode("utf-8")).decode()
     page = (tpl.replace("__DATA__", b64)
@@ -129,18 +83,29 @@ for mod in ["exam_associate", "exam_developer", "exam_architect_f", "exam_archit
     cards.append(ex)
     print("OK", ex["file"], f"banco={len(qs)} multiple={multi}")
 
-simulation_data = {
-    "schemaVersion": 1,
-    "blueprintVersion": BLUEPRINT_VERSION,
-    "profiles": simulation_profiles,
-    "questions": simulation_questions,
+simulation_profiles = {
+    code: {
+        "code": code,
+        "title": profile["title"],
+        "blueprintVersion": BLUEPRINT_VERSION,
+        "questionCount": profile["question_count"],
+        "timeLimitSeconds": SIMULATION_MINUTES * 60,
+        "language": "en",
+        "minimumForms": 3,
+        "domains": [
+            {"id": domain["id"], "name": domain["name"], "weight": domain["weight"],
+             "quota": profile["quota"][domain["id"]]}
+            for domain in profile["domains"]
+        ],
+    }
+    for code, profile in OFFICIAL_PROFILES.items()
 }
-(GENERATED / "simulation-data.js").write_text(
-    "// Generated by build/build.py. This Worker-only module contains answer keys.\n"
-    "export const SIMULATION_DATA = " + json.dumps(simulation_data, ensure_ascii=False, separators=(",", ":")) + ";\n",
+(GENERATED / "simulation-profiles.js").write_text(
+    "// Generated by build/build.py. Public blueprint metadata only; no question bank or answer key.\n"
+    "export const SIMULATION_PROFILES = " + json.dumps(simulation_profiles, ensure_ascii=False, separators=(",", ":")) + ";\n",
     encoding="utf-8",
 )
-print("OK src/generated/simulation-data.js")
+print("OK src/generated/simulation-profiles.js")
 
 items = "".join(
     f'<a class="card" href="{c["file"]}"><span class="pill">{c["code"]}</span><h2 data-en="{html.escape(translations_en.get(c["code"], {}).get("title", c["title"]))}">{html.escape(c["title"])}</h2>'
